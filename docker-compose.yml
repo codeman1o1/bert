@@ -1,0 +1,47 @@
+version: "2.4"
+services:
+  bert:
+    container_name: bert
+    build: "."
+    image: codeman1o1/bert
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      lavalink:
+        condition: service_started
+    restart: unless-stopped
+
+  lavalink:
+    container_name: bert-lavalink
+    image: ghcr.io/lavalink-devs/lavalink:4
+    env_file:
+      - .env
+    environment:
+      - _JAVA_OPTIONS=-Xmx3G
+      - SERVER_PORT=2333
+      - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD}
+    restart: unless-stopped
+
+  db:
+    container_name: bert-db
+    image: postgres:16-alpine
+    healthcheck:
+      test: "pg_isready -U bert -d bert"
+      interval: 2s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+      - bertdb:/var/lib/postgresql/data
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=bert
+      - POSTGRES_DB=bert
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    restart: unless-stopped
+
+volumes:
+  bertdb:

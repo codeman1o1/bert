@@ -1,5 +1,5 @@
 # https://github.com/aio-libs/aiohttp/issues/7675#issuecomment-1812900722
-FROM python:3.10-alpine
+FROM python:3.12-alpine
 
 WORKDIR /usr/src/app
 

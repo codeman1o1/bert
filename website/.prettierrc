@@ -1,0 +1,10 @@
+{
+	"semi": false,
+	"trailingComma": "none",
+	"singleQuote": false,
+	"vueIndentScriptAndStyle": false,
+	"bracketSpacing": true,
+	"bracketSameLine": false,
+	"arrowParens": "always",
+	"plugins": ["prettier-plugin-organize-imports", "prettier-plugin-tailwindcss"]
+}

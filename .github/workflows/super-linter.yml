@@ -24,6 +24,7 @@ jobs:
         uses: super-linter/super-linter/slim@v5.7.2 # x-release-please-version
         env:
           DEFAULT_BRANCH: main
-          TYPESCRIPT_STANDARD_TSCONFIG_FILE: ${DEFAULT_WORKSPACE}/website/tsconfig.json
+          TYPESCRIPT_DEFAULT_STYLE: prettier
+          TYPESCRIPT_ES_CONFIG_FILE: website/.eslintrc.cjs
           # To report GitHub Actions status checks
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

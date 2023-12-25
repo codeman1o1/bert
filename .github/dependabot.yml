@@ -1,14 +1,14 @@
 version: 2
 updates:
   - package-ecosystem: "pip"
-    directory: "/"
+    directory: "/bot"
     schedule:
       interval: "monthly"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-patch"]
-  - package-ecosystem: "docker"
-    directory: "/"
+  - package-ecosystem: "npm"
+    directory: "/website"
     schedule:
       interval: "monthly"
     ignore:

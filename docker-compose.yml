@@ -2,7 +2,7 @@ version: "2.4"
 services:
   bert:
     container_name: bert
-    build: "."
+    build: "./bot"
     image: codeman1o1/bert
     env_file:
       - .env
@@ -11,6 +11,16 @@ services:
         condition: service_healthy
       lavalink:
         condition: service_started
+    restart: unless-stopped
+
+  website:
+    container_name: bert-website
+    build: "./website"
+    image: codeman1o1/bertsite
+    ports:
+      - "6969:3000"
+    env_file:
+      - .env
     restart: unless-stopped
 
   lavalink:

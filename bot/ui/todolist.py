@@ -1,6 +1,6 @@
 import discord
-from discord.interactions import Interaction
 from db import db
+from discord.interactions import Interaction
 
 
 class AddModal(discord.ui.Modal):

@@ -11,6 +11,11 @@ updates:
     directory: "/website"
     schedule:
       interval: "monthly"
+    groups:
+      nuxt-vue:
+        patterns:
+          - "*nuxt*"
+          - "*vue*"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-patch"]

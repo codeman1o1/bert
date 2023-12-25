@@ -1,16 +1,17 @@
 import contextlib
+import logging
+import os
+import re
 from asyncio import sleep
 from datetime import datetime, timedelta
-import os
-import logging
-import re
-import discord
-from discord.ext import commands, tasks
-import wavelink
-from dotenv import load_dotenv
-import feedparser
+
 import coloredlogs
+import discord
+import feedparser
+import wavelink
 from db import db
+from discord.ext import commands, tasks
+from dotenv import load_dotenv
 from ui.todolist import Todolist
 
 load_dotenv()
@@ -56,8 +57,8 @@ coloredlogs.install(
     fmt=TEXT_FORMAT,
 )
 
-for handler in pycord_logger.handlers:
-    handler.addFilter(LogFilter())
+for pycord_handler in pycord_logger.handlers:
+    pycord_handler.addFilter(LogFilter())
 
 
 async def connect_nodes():

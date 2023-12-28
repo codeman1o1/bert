@@ -276,4 +276,18 @@ async def skip(interaction: discord.Interaction):
     await interaction.response.send_message("Skipped the current song")
 
 
+@bert.slash_command()
+async def stop(interaction: discord.Interaction):
+    """Stop playing"""
+    player: wavelink.Player = interaction.guild.voice_client
+
+    if not player:
+        await interaction.response.send_message("Not playing anything")
+        return
+
+    await player.stop()
+    await player.disconnect()
+    await interaction.response.send_message("Stopped playing")
+
+
 bert.run(os.getenv("BOT_TOKEN"))

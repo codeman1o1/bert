@@ -4,8 +4,6 @@
 
 ### bert
 
-### bert
-
 #### bert
 
 ##### bert

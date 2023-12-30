@@ -226,6 +226,11 @@ async def play(interaction: discord.Interaction, query: str):
         await interaction.response.send_message("You are not in a voice channel")
         return
 
+    tracks = await wavelink.Playable.search(query)
+    if not tracks:
+        await interaction.response.send_message("No tracks found")
+        return
+
     player: wavelink.Player = interaction.guild.voice_client
 
     if not player:
@@ -243,11 +248,6 @@ async def play(interaction: discord.Interaction, query: str):
             return
 
     player.autoplay = wavelink.AutoPlayMode.partial
-
-    tracks = await wavelink.Playable.search(query)
-    if not tracks:
-        await interaction.response.send_message("No tracks found")
-        return
 
     if isinstance(tracks, wavelink.Playlist):
         added = await player.queue.put_wait(tracks)

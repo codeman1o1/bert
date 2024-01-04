@@ -3,6 +3,7 @@ from asyncio import sleep
 from datetime import datetime, timedelta
 import os
 import logging
+from random import choice
 import re
 import discord
 from discord.ext import commands, tasks
@@ -24,7 +25,6 @@ bert = commands.Bot(
 
 class LogFilter(logging.Filter):
     def filter(self, record: logging.LogRecord):
-        # print(str(record.msg))
         regexs = [
             r"^Shard ID (%s) has sent the (\w+) payload\.$",
             r"^Got a request to (%s) the websocket\.$",
@@ -101,7 +101,6 @@ async def send_news_rss():
             logger.debug("Found new news item: %s", title)
     if news_items_as_embeds:
         news_items_as_embeds.sort(key=lambda embed: embed.timestamp)
-
         channels = [
             channel
             for channel in bert.get_all_channels()
@@ -217,6 +216,52 @@ async def todo(interaction: discord.Interaction):
     for row in result:
         embed.add_field(name=row[1], value=row[2])
     await interaction.response.send_message(embed=embed, view=Todolist())
+
+
+@bert.slash_command()
+async def rapidlysendmessages(
+    interaction: discord.Interaction, user: discord.Member, message: str, amount: int
+):
+    """fuck that guy"""
+    we_should_follow_up = False
+
+    if not 0 < amount <= 25:
+        await interaction.response.send_message(
+            "Please choose a number between 1 and 25", ephemeral=True
+        )
+        return
+
+    if user == bert.user:
+        user = choice(
+            [member for member in interaction.guild.members if not member.bot]
+        )
+        await interaction.response.send_message(
+            f"im not gonna message myself lets do {user.mention} instead",
+            ephemeral=True,
+        )
+        we_should_follow_up = True
+
+    if not we_should_follow_up:
+        await interaction.response.send_message(
+            f"Sending {amount} message{'s' if amount > 1 else ''} to {user.mention}...",
+            ephemeral=True,
+        )
+    else:
+        await interaction.followup.send(
+            f"Sending {amount} message{'s' if amount > 1 else ''} to {user.mention}...",
+            ephemeral=True,
+        )
+
+    try:
+        for _ in range(amount):
+            await user.send(message)
+        await interaction.followup.send("Done!", ephemeral=True)
+    except discord.Forbidden:
+        await interaction.followup.send(
+            "Could not send messages, most likely because"
+            "the user has DM's from Bert blocked\n||stupid bitch||",
+            ephemeral=True,
+        )
 
 
 @bert.slash_command()

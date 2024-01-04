@@ -240,6 +240,9 @@ async def rapidlysendmessages(
             ephemeral=True,
         )
         we_should_follow_up = True
+    elif user == interaction.user:
+        await interaction.response.send_message("if you insist i guess", ephemeral=True)
+        we_should_follow_up = True
 
     if not we_should_follow_up:
         await interaction.response.send_message(

@@ -3,7 +3,8 @@ import logging
 import os
 import re
 from asyncio import sleep
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from random import choice
 
 import coloredlogs
 import discord
@@ -25,7 +26,6 @@ bert = commands.Bot(
 
 class LogFilter(logging.Filter):
     def filter(self, record: logging.LogRecord):
-        # print(str(record.msg))
         regexs = [
             r"^Shard ID (%s) has sent the (\w+) payload\.$",
             r"^Got a request to (%s) the websocket\.$",
@@ -75,7 +75,7 @@ async def connect_nodes():
 
 @tasks.loop(hours=1)
 async def send_news_rss():
-    current_time = datetime.utcnow() + timedelta(hours=2)  # UTC+2 timezone
+    current_time = datetime.now(timezone.utc()) + timedelta(hours=2)  # UTC+2 timezone
     past_hour = current_time - timedelta(hours=1)
 
     overheid_data = feedparser.parse("https://feeds.rijksoverheid.nl/nieuws.rss")
@@ -102,7 +102,6 @@ async def send_news_rss():
             logger.debug("Found new news item: %s", title)
     if news_items_as_embeds:
         news_items_as_embeds.sort(key=lambda embed: embed.timestamp)
-
         channels = [
             channel
             for channel in bert.get_all_channels()
@@ -221,20 +220,90 @@ async def todo(interaction: discord.Interaction):
 
 
 @bert.slash_command()
-async def play(interaction: discord.Interaction, query: str):
+async def rapidlysendmessages(
+    interaction: discord.Interaction, user: discord.Member, message: str, amount: int
+):
+    """fuck that guy"""
+    we_should_follow_up = False
+
+    if not 0 < amount <= 25:
+        await interaction.response.send_message(
+            "Please choose a number between 1 and 25", ephemeral=True
+        )
+        return
+
+    if user == bert.user:
+        user = choice(
+            [member for member in interaction.guild.members if not member.bot]
+        )
+        await interaction.response.send_message(
+            f"im not gonna message myself lets do {user.mention} instead",
+            ephemeral=True,
+        )
+        we_should_follow_up = True
+    elif user == interaction.user:
+        await interaction.response.send_message("if you insist i guess", ephemeral=True)
+        we_should_follow_up = True
+
+    if not we_should_follow_up:
+        await interaction.response.send_message(
+            f"Sending {amount} message{'s' if amount > 1 else ''} to {user.mention}...",
+            ephemeral=True,
+        )
+    else:
+        await interaction.followup.send(
+            f"Sending {amount} message{'s' if amount > 1 else ''} to {user.mention}...",
+            ephemeral=True,
+        )
+
+    try:
+        for _ in range(amount):
+            await user.send(message)
+        await interaction.followup.send("Done!", ephemeral=True)
+    except discord.Forbidden:
+        await interaction.followup.send(
+            "Could not send messages, most likely because"
+            "the user has DM's from Bert blocked\n||stupid bitch||",
+            ephemeral=True,
+        )
+
+
+@bert.slash_command()
+async def play(
+    interaction: discord.Interaction, query: str, channel: discord.VoiceChannel = None
+):
     """Play a song or playlist"""
-    if not interaction.user.voice:
-        await interaction.response.send_message("You are not in a voice channel")
+    if not interaction.user.voice and not channel:
+        await interaction.response.send_message(
+            "You are not in a voice channel", ephemeral=True
+        )
+        return
+
+    if channel and not [member for member in channel.members if not member.bot]:
+        await interaction.response.send_message(
+            "That's an empty voice channel (or it only has bots)!", ephemeral=True
+        )
+        return
+
+    tracks = await wavelink.Playable.search(query)
+    if not tracks:
+        await interaction.response.send_message("No tracks found")
         return
 
     player: wavelink.Player = interaction.guild.voice_client
 
     if not player:
         try:
-            player = await interaction.user.voice.channel.connect(cls=wavelink.Player)
+            if channel:
+                player = await channel.connect(cls=wavelink.Player)
+            else:
+                player = await interaction.user.voice.channel.connect(
+                    cls=wavelink.Player
+                )
         except AttributeError:
             await interaction.response.send_message(
-                "Please join a voice channel first before using this command."
+                "Please join a voice channel first before using this command.",
+                ephemeral=True,
             )
             return
         except discord.ClientException:
@@ -244,11 +313,6 @@ async def play(interaction: discord.Interaction, query: str):
             return
 
     player.autoplay = wavelink.AutoPlayMode.partial
-
-    tracks = await wavelink.Playable.search(query)
-    if not tracks:
-        await interaction.response.send_message("No tracks found")
-        return
 
     if isinstance(tracks, wavelink.Playlist):
         added = await player.queue.put_wait(tracks)
@@ -275,6 +339,20 @@ async def skip(interaction: discord.Interaction):
 
     await player.skip()
     await interaction.response.send_message("Skipped the current song")
+
+
+@bert.slash_command()
+async def stop(interaction: discord.Interaction):
+    """Stop playing"""
+    player: wavelink.Player = interaction.guild.voice_client
+
+    if not player:
+        await interaction.response.send_message("Not playing anything")
+        return
+
+    await player.stop()
+    await player.disconnect()
+    await interaction.response.send_message("Stopped playing")
 
 
 bert.run(os.getenv("BOT_TOKEN"))

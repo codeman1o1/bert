@@ -3,6 +3,7 @@ FROM python:3.10-alpine
 
 WORKDIR /usr/src/app
 
+# hadolint ignore=DL3018
 RUN apk add --no-cache gcc libc-dev libffi-dev
 
 COPY requirements.txt ./

@@ -1,6 +1,6 @@
 import discord
+from db import DB
 from discord.interactions import Interaction
-from db import db
 
 
 class AddModal(discord.ui.Modal):
@@ -11,7 +11,7 @@ class AddModal(discord.ui.Modal):
         self.msg = msg
 
     async def callback(self, interaction: Interaction):
-        name_in_use = db.execute(
+        name_in_use = DB.execute(
             "SELECT * FROM todo WHERE name = %s AND guild = %s",
             (self.children[0].value, interaction.guild.id),
         ).fetchone()
@@ -20,7 +20,7 @@ class AddModal(discord.ui.Modal):
                 "That name is already in use", ephemeral=True
             )
             return
-        db.execute(
+        DB.execute(
             "INSERT INTO todo (name, description, owner, guild) VALUES (%s, %s, %s, %s)",
             (
                 self.children[0].value,
@@ -29,7 +29,7 @@ class AddModal(discord.ui.Modal):
                 interaction.guild.id,
             ),
         )
-        db.commit()
+        DB.commit()
         await interaction.response.send_message(
             f"Added todo item **{self.children[0].value}**", ephemeral=True
         )
@@ -41,7 +41,7 @@ class AddModal(discord.ui.Modal):
 
 class DeleteSelect(discord.ui.Select):
     def __init__(self, userId: int, guildId: int, msg: discord.Message):
-        results = db.execute(
+        results = DB.execute(
             "SELECT * FROM todo WHERE owner = %s AND guild = %s", (userId, guildId)
         ).fetchmany()
         options = [
@@ -52,7 +52,7 @@ class DeleteSelect(discord.ui.Select):
         self.msg = msg
 
     async def callback(self, interaction: Interaction):
-        deleted = db.execute(
+        deleted = DB.execute(
             "DELETE FROM todo WHERE id = %s AND guild = %s RETURNING *",
             (self.values[0], interaction.guild.id),
         ).fetchone()

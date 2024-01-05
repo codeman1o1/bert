@@ -1,17 +1,18 @@
 import contextlib
+import logging
+import os
+import re
 from asyncio import sleep
 from datetime import datetime, timedelta, timezone
-import os
-import logging
 from random import choice
-import re
-import discord
-from discord.ext import commands, tasks
-import wavelink
-from dotenv import load_dotenv
-import feedparser
+
 import coloredlogs
-from db import db
+import discord
+import feedparser
+import wavelink
+from db import DB
+from discord.ext import commands, tasks
+from dotenv import load_dotenv
 from ui.todolist import Todolist
 
 load_dotenv()
@@ -56,8 +57,8 @@ coloredlogs.install(
     fmt=TEXT_FORMAT,
 )
 
-for handler in pycord_logger.handlers:
-    handler.addFilter(LogFilter())
+for pycord_handler in pycord_logger.handlers:
+    pycord_handler.addFilter(LogFilter())
 
 
 async def connect_nodes():
@@ -204,7 +205,7 @@ async def _bert(interaction: discord.Interaction):
 @bert.slash_command()
 async def todo(interaction: discord.Interaction):
     """done"""
-    result = db.execute(
+    result = DB.execute(
         "SELECT * FROM todo WHERE guild = %s", (interaction.guild.id,)
     ).fetchall()
 

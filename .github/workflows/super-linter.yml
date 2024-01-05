@@ -24,6 +24,7 @@ jobs:
         run: |
           cd website
           npm ci
+          mv node_modules ../node_modules
 
       - name: Super-linter
         uses: super-linter/super-linter/slim@v5.7.2

@@ -268,10 +268,20 @@ async def rapidlysendmessages(
 
 
 @bert.slash_command()
-async def play(interaction: discord.Interaction, query: str):
+async def play(
+    interaction: discord.Interaction, query: str, channel: discord.VoiceChannel = None
+):
     """Play a song or playlist"""
-    if not interaction.user.voice:
-        await interaction.response.send_message("You are not in a voice channel")
+    if not interaction.user.voice and not channel:
+        await interaction.response.send_message(
+            "You are not in a voice channel", ephemeral=True
+        )
+        return
+
+    if channel and not [member for member in channel.members if not member.bot]:
+        await interaction.response.send_message(
+            "That's an empty voice channel (or it only has bots)!", ephemeral=True
+        )
         return
 
     tracks = await wavelink.Playable.search(query)
@@ -283,10 +293,16 @@ async def play(interaction: discord.Interaction, query: str):
 
     if not player:
         try:
-            player = await interaction.user.voice.channel.connect(cls=wavelink.Player)
+            if channel:
+                player = await channel.connect(cls=wavelink.Player)
+            else:
+                player = await interaction.user.voice.channel.connect(
+                    cls=wavelink.Player
+                )
         except AttributeError:
             await interaction.response.send_message(
-                "Please join a voice channel first before using this command."
+                "Please join a voice channel first before using this command.",
+                ephemeral=True,
             )
             return
         except discord.ClientException:

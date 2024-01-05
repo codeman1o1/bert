@@ -26,7 +26,7 @@ jobs:
           npm ci
 
       - name: Super-linter
-        uses: super-linter/super-linter/slim@v5.7.2 # x-release-please-version
+        uses: super-linter/super-linter/slim@v5.7.2
         env:
           DEFAULT_BRANCH: main
           LINTER_RULES_PATH: /

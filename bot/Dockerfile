@@ -5,6 +5,7 @@ WORKDIR /usr/src/app
 
 COPY . .
 
+# hadolint ignore=DL3018
 RUN apk add --no-cache gcc libc-dev libffi-dev
 
 RUN pip install --no-cache-dir -r ./requirements.txt

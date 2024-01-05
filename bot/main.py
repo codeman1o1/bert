@@ -9,7 +9,7 @@ import coloredlogs
 import discord
 import feedparser
 import wavelink
-from db import db
+from db import DB
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from ui.todolist import Todolist
@@ -206,7 +206,7 @@ async def _bert(interaction: discord.Interaction):
 @bert.slash_command()
 async def todo(interaction: discord.Interaction):
     """done"""
-    result = db.execute(
+    result = DB.execute(
         "SELECT * FROM todo WHERE guild = %s", (interaction.guild.id,)
     ).fetchall()
 

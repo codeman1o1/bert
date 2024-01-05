@@ -5,4 +5,4 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-db = psycopg.connect(os.getenv("DATABASE_URL"))
+DB = psycopg.connect(os.getenv("DATABASE_URL"))

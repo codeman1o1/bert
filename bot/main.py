@@ -5,10 +5,14 @@ import re
 from asyncio import sleep
 from datetime import datetime, timedelta, timezone
 from random import choice
+import requests
 
 import coloredlogs
 import discord
 import feedparser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_community.llms import Ollama
 import wavelink
 from db import DB
 from discord.ext import commands, tasks
@@ -22,6 +26,22 @@ bert = commands.Bot(
     intents=discord.Intents.all(),
     # debug_guilds=[870973430114181141, 1072785326168346706, 1182803938517455008],
 )
+requests.post("http://ai:11434/api/pull", {"name": "llama2-uncensored"})
+ollama = Ollama(base_url="http://ai:11434", model="llama2-uncensored")
+prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "Your name is Bert. You are a Discord Bot intended to help people but also have fun."
+            "You have permission to curse, as it may make the conversation funnier."
+            "If someone curses at you, curse back at them."
+            "If asked in a specific language, respond back in that language, but try to keep the conversation in English or Dutch.",
+        ),
+        ("user", "{input}"),
+    ]
+)
+output_parser = StrOutputParser()
+llm = prompt | ollama | output_parser
 
 
 class LogFilter(logging.Filter):
@@ -137,6 +157,10 @@ async def on_message(message: discord.Message):
 
     if isinstance(message.channel, discord.DMChannel):
         await message.channel.send(message.content)
+
+    if message.channel.name == "bert-ai":
+        ai_reply = llm.invoke({"input": message.content})
+        await message.channel.send(ai_reply)
 
 
 @bert.event

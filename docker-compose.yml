@@ -12,6 +12,8 @@ services:
         condition: service_healthy
       lavalink:
         condition: service_started
+      ai:
+        condition: service_started
     restart: unless-stopped
 
   website:
@@ -54,5 +56,20 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     restart: unless-stopped
 
+  ai:
+    container_name: bert-ai
+    image: ollama/ollama
+    volumes:
+      - bertai:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
 volumes:
   bertdb:
+  bertai:

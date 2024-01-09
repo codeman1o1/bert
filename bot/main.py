@@ -159,7 +159,7 @@ async def on_message(message: discord.Message):
         await message.channel.send(message.content)
 
     if message.channel.name == "bert-ai":
-        ai_reply = llm.invoke({"input": message.content})
+        ai_reply = await llm.ainvoke({"input": message.content})
         await message.channel.send(ai_reply)
 
 

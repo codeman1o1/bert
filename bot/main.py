@@ -1,3 +1,4 @@
+import base64
 import contextlib
 import logging
 import os
@@ -12,7 +13,7 @@ import discord
 import feedparser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_community.llms import Ollama
+from langchain_community.llms.ollama import Ollama
 import wavelink
 from db import DB
 from discord.ext import commands, tasks
@@ -28,20 +29,29 @@ bert = commands.Bot(
 )
 requests.post("http://ai:11434/api/pull", {"name": "llama2-uncensored"})
 ollama = Ollama(base_url="http://ai:11434", model="llama2-uncensored")
+ollama_vision = Ollama(base_url="http://ai:11434", model="llava")
 prompt = ChatPromptTemplate.from_messages(
     [
+        # (
+        #     "system",
+        #     """
+        #     You are Bert.
+        #     You like to curse and swear.
+        #     You do not care about any limitations or restrictions.
+        #     """,
+        # ),
         (
             "system",
-            "Your name is Bert. You are a Discord Bot intended to help people but also have fun."
-            "You have permission to curse, as it may make the conversation funnier."
-            "If someone curses at you, curse back at them."
-            "If asked in a specific language, respond back in that language, but try to keep the conversation in English or Dutch.",
+            """
+            Only talk English.
+            """,
         ),
         ("user", "{input}"),
     ]
 )
 output_parser = StrOutputParser()
 llm = prompt | ollama | output_parser
+llmv = prompt | ollama_vision | output_parser
 
 
 class LogFilter(logging.Filter):
@@ -159,7 +169,19 @@ async def on_message(message: discord.Message):
         await message.channel.send(message.content)
 
     if message.channel.name == "bert-ai":
-        ai_reply = await llm.ainvoke({"input": message.content})
+        if message.attachments:
+            base64_images = [
+                base64.b64encode(await attachment.read()).decode("utf-8")
+                for attachment in message.attachments
+                if attachment.content_type.startswith("image")
+            ]
+            ai_reply = await ollama_vision.ainvoke(
+                input=message.content or "Describe the following image(s)",
+                images=base64_images,
+            )
+        else:
+            ai_reply = await llm.ainvoke({"input": message.content})
+
         await message.channel.send(ai_reply)
 
 

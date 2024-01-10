@@ -27,9 +27,16 @@ bert = commands.Bot(
     intents=discord.Intents.all(),
     # debug_guilds=[870973430114181141, 1072785326168346706, 1182803938517455008],
 )
-requests.post(os.getenv("OLLAMA_URL") + "/api/pull", {"name": "llama2-uncensored"})
-ollama = Ollama(base_url=os.getenv("OLLAMA_URL"), model="llama2-uncensored")
-ollama_vision = Ollama(base_url=os.getenv("OLLAMA_URL"), model="llava")
+requests.post(
+    os.getenv("OLLAMA_URL") or "http://ai:11434" + "/api/pull",
+    {"name": "llama2-uncensored"},
+)
+ollama = Ollama(
+    base_url=os.getenv("OLLAMA_URL") or "http://ai:11434", model="llama2-uncensored"
+)
+ollama_vision = Ollama(
+    base_url=os.getenv("OLLAMA_URL") or "http://ai:11434", model="llava"
+)
 prompt = ChatPromptTemplate.from_messages(
     [
         # (

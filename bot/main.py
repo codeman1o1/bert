@@ -3,7 +3,7 @@ import logging
 import os
 import re
 from asyncio import sleep
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from random import choice
 
 import coloredlogs
@@ -13,6 +13,7 @@ import wavelink
 from db import DB
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+import pytz
 from ui.todolist import Todolist
 
 load_dotenv()
@@ -22,6 +23,8 @@ bert = commands.Bot(
     intents=discord.Intents.all(),
     # debug_guilds=[870973430114181141, 1072785326168346706, 1182803938517455008],
 )
+
+nl_tz = pytz.timezone("Europe/Amsterdam")
 
 
 class LogFilter(logging.Filter):
@@ -75,16 +78,14 @@ async def connect_nodes():
 
 @tasks.loop(hours=1)
 async def send_news_rss():
-    current_time = datetime.now(timezone.utc) + timedelta(hours=2)  # UTC+2 timezone
-    past_hour = (current_time - timedelta(hours=1)).replace(tzinfo=timezone.utc)
+    current_time = datetime.now(nl_tz)
+    past_hour = current_time - timedelta(hours=1)
 
     overheid_data = feedparser.parse("https://feeds.rijksoverheid.nl/nieuws.rss")
     data = overheid_data["entries"]
     news_items_as_embeds = []
     for entry in data:
-        published_datetime = datetime(*entry["published_parsed"][:6]) + timedelta(
-            hours=2
-        )
+        published_datetime = nl_tz.localize(datetime(*entry["published_parsed"][:6]))
 
         if published_datetime >= past_hour:
             title = entry["title"]

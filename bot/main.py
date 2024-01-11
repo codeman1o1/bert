@@ -9,11 +9,11 @@ from random import choice
 import coloredlogs
 import discord
 import feedparser
+import pytz
 import wavelink
 from db import DB
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-import pytz
 from ui.todolist import Todolist
 
 load_dotenv()

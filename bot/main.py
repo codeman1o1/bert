@@ -76,7 +76,7 @@ async def connect_nodes():
 @tasks.loop(hours=1)
 async def send_news_rss():
     current_time = datetime.now(timezone.utc) + timedelta(hours=2)  # UTC+2 timezone
-    past_hour = current_time - timedelta(hours=1)
+    past_hour = (current_time - timedelta(hours=1)).replace(tzinfo=timezone.utc)
 
     overheid_data = feedparser.parse("https://feeds.rijksoverheid.nl/nieuws.rss")
     data = overheid_data["entries"]

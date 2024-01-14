@@ -189,7 +189,8 @@ async def on_wavelink_track_end(payload: wavelink.TrackEndEventPayload):
     if not payload.player:
         return
 
-    await payload.player.disconnect()
+    if not payload.player.queue:
+        await payload.player.disconnect()
 
 
 @bert.event

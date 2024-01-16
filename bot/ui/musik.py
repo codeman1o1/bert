@@ -2,7 +2,16 @@ import discord
 import wavelink
 
 
-class AddBack(discord.ui.View):
+class MusicView(discord.ui.View):
+    async def setup_player(self, interaction: discord.Interaction) -> wavelink.Player:
+        player: wavelink.Player = interaction.guild.voice_client
+        if not player:
+            player = await interaction.user.voice.channel.connect(cls=wavelink.Player)
+        player.autoplay = wavelink.AutoPlayMode.partial
+        return player
+
+
+class AddBack(MusicView):
     def __init__(self, track):
         super().__init__()
         self.track: wavelink.Playable = track
@@ -11,10 +20,7 @@ class AddBack(discord.ui.View):
     async def add_back(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
-        player: wavelink.Player = interaction.guild.voice_client
-        if not player:
-            player = await interaction.user.voice.channel.connect(cls=wavelink.Player)
-        player.autoplay = wavelink.AutoPlayMode.partial
+        player = await self.setup_player(interaction)
         await player.queue.put_wait(self.track)
         if not player.playing:
             await player.play(player.queue.get(), volume=30)
@@ -25,7 +31,7 @@ class AddBack(discord.ui.View):
         )
 
 
-class RestoreQueue(discord.ui.View):
+class RestoreQueue(MusicView):
     def __init__(self, queue):
         super().__init__()
         self.queue: wavelink.Queue = queue
@@ -34,10 +40,7 @@ class RestoreQueue(discord.ui.View):
     async def restore(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
-        player: wavelink.Player = interaction.guild.voice_client
-        if not player:
-            player = await interaction.user.voice.channel.connect(cls=wavelink.Player)
-        player.autoplay = wavelink.AutoPlayMode.partial
+        player = await self.setup_player(interaction)
         for track in self.queue:
             await player.queue.put_wait(track)
         if not player.playing:

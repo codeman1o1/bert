@@ -12,9 +12,10 @@ import feedparser
 import pytz
 import wavelink
 from db import DB
+from ui.musik import AddBack, RestoreQueue
+from ui.todolist import Todolist
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from ui.todolist import Todolist
 
 load_dotenv()
 
@@ -339,8 +340,12 @@ async def skip(interaction: discord.Interaction):
         await interaction.response.send_message("Not playing anything")
         return
 
+    current_track = player.current
+
     await player.skip()
-    await interaction.response.send_message("Skipped the current song")
+    await interaction.response.send_message(
+        "Skipped the current song", view=AddBack(current_track)
+    )
 
 
 @bert.slash_command()
@@ -352,9 +357,16 @@ async def stop(interaction: discord.Interaction):
         await interaction.response.send_message("Not playing anything")
         return
 
+    current_queue = wavelink.Queue()
+    await current_queue.put_wait(player.current)
+    for track in player.queue:
+        await current_queue.put_wait(track)
+
     await player.stop()
     await player.disconnect()
-    await interaction.response.send_message("Stopped playing")
+    await interaction.response.send_message(
+        "Stopped playing", view=RestoreQueue(current_queue)
+    )
 
 
 bert.run(os.getenv("BOT_TOKEN"))

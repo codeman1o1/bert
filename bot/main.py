@@ -4,7 +4,7 @@ import os
 import re
 from asyncio import sleep
 from datetime import datetime, timedelta
-from random import choice
+from random import choice, randint
 
 import coloredlogs
 import discord
@@ -231,10 +231,11 @@ async def rapidlysendmessages(
 ):
     """fuck that guy"""
     we_should_follow_up = False
+    snitch = randint(0, 1) == 1
 
     if not 0 < amount <= 25:
         await interaction.response.send_message(
-            "Please choose a number between 1 and 25", ephemeral=True
+            "Please choose a number between 1 and 25", ephemeral=snitch
         )
         return
 
@@ -244,33 +245,33 @@ async def rapidlysendmessages(
         )
         await interaction.response.send_message(
             f"im not gonna message myself lets do {user.mention} instead",
-            ephemeral=True,
+            ephemeral=snitch,
         )
         we_should_follow_up = True
     elif user == interaction.user:
-        await interaction.response.send_message("if you insist i guess", ephemeral=True)
+        await interaction.response.send_message("sounds like suicide", ephemeral=snitch)
         we_should_follow_up = True
 
     if not we_should_follow_up:
         await interaction.response.send_message(
             f"Sending {amount} message{'s' if amount > 1 else ''} to {user.mention}...",
-            ephemeral=True,
+            ephemeral=snitch,
         )
     else:
         await interaction.followup.send(
             f"Sending {amount} message{'s' if amount > 1 else ''} to {user.mention}...",
-            ephemeral=True,
+            ephemeral=snitch,
         )
 
     try:
         for _ in range(amount):
             await user.send(message)
-        await interaction.followup.send("Done!", ephemeral=True)
+        await interaction.followup.send("Done!", ephemeral=snitch)
     except discord.Forbidden:
         await interaction.followup.send(
             "Could not send messages, most likely because"
             "the user has DM's from Bert blocked\n||stupid bitch||",
-            ephemeral=True,
+            ephemeral=snitch,
         )
 
 

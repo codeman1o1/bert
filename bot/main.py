@@ -139,13 +139,15 @@ async def on_message(message: discord.Message):
 
     if isinstance(message.channel, discord.DMChannel):
         await message.channel.send(message.content)
+        return
 
 
 @bert.event
 async def on_member_join(member: discord.Member):
     if not member.bot:
         await member.guild.system_channel.send(f"bonjour {member.mention}")
-        await member.send(f"bonjour {member.mention}")
+        with contextlib.suppress(discord.Forbidden):
+            await member.send(f"bonjour {member.mention}")
     elif bot_role := discord.utils.find(
         lambda role: role.name.lower() in ("bot", "bots"), member.guild.roles
     ):
@@ -157,7 +159,8 @@ async def on_member_join(member: discord.Member):
 async def on_member_remove(member: discord.Member):
     if not member.bot:
         await member.guild.system_channel.send(f"doeidoei {member.name}")
-        await member.send(f"doeidoei {member.name}")
+        with contextlib.suppress(discord.Forbidden):
+            await member.send(f"doeidoei {member.name}")
 
 
 @bert.event

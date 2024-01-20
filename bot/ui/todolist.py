@@ -12,7 +12,7 @@ class AddModal(discord.ui.Modal):
 
     async def callback(self, interaction: Interaction):
         name_in_use = DB.execute(
-            "SELECT * FROM todo WHERE name = %s AND guild = %s",
+            "SELECT * FROM todos WHERE name = %s AND guild = %s",
             (self.children[0].value, interaction.guild.id),
         ).fetchone()
         if name_in_use is not None:
@@ -21,7 +21,7 @@ class AddModal(discord.ui.Modal):
             )
             return
         DB.execute(
-            "INSERT INTO todo (name, description, owner, guild) VALUES (%s, %s, %s, %s)",
+            "INSERT INTO todos (name, description, owner, guild) VALUES (%s, %s, %s, %s)",
             (
                 self.children[0].value,
                 self.children[1].value,
@@ -42,7 +42,7 @@ class AddModal(discord.ui.Modal):
 class DeleteSelect(discord.ui.Select):
     def __init__(self, userId: int, guildId: int, msg: discord.Message):
         results = DB.execute(
-            "SELECT * FROM todo WHERE owner = %s AND guild = %s", (userId, guildId)
+            "SELECT * FROM todos WHERE owner = %s AND guild = %s", (userId, guildId)
         ).fetchmany()
         options = [
             discord.SelectOption(label=row[1], value=str(row[0]), description=row[2])
@@ -53,7 +53,7 @@ class DeleteSelect(discord.ui.Select):
 
     async def callback(self, interaction: Interaction):
         deleted = DB.execute(
-            "DELETE FROM todo WHERE id = %s AND guild = %s RETURNING *",
+            "DELETE FROM todos WHERE id = %s AND guild = %s RETURNING *",
             (self.values[0], interaction.guild.id),
         ).fetchone()
         await interaction.response.send_message(

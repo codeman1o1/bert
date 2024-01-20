@@ -212,7 +212,7 @@ async def _bert(interaction: discord.Interaction):
 async def todo(interaction: discord.Interaction):
     """done"""
     result = DB.execute(
-        "SELECT * FROM todo WHERE guild = %s", (interaction.guild.id,)
+        "SELECT * FROM todos WHERE guild = %s", (interaction.guild.id,)
     ).fetchall()
 
     if result is None:

@@ -138,7 +138,8 @@ async def on_message(message: discord.Message):
         return
 
     if isinstance(message.channel, discord.DMChannel):
-        await message.channel.send(message.content)
+        if message.content:
+            await message.channel.send(message.content)
         return
 
 

@@ -1,4 +1,4 @@
-import asyncio
+# import asyncio
 import base64
 import contextlib
 import logging
@@ -83,7 +83,8 @@ async def connect_nodes():
 
     nodes = [
         wavelink.Node(
-            uri="http://lavalink:2333", password=os.getenv("LAVALINK_PASSWORD")
+            uri=os.getenv("LAVALINK_URL") or "http://lavalink:2333",
+            password=os.getenv("LAVALINK_PASSWORD"),
         )
     ]
     await wavelink.Pool.connect(nodes=nodes, client=bert)
@@ -169,24 +170,7 @@ async def on_message(message: discord.Message):
                 model="llama2-uncensored", prompt=message.content
             )
 
-        await message.channel.send(ai_reply)
-
-    if message.channel.name == "bert-ai":
-        if message.attachments:
-            base64_images = [
-                base64.b64encode(await attachment.read()).decode("utf-8")
-                for attachment in message.attachments
-                if attachment.content_type.startswith("image")
-            ]
-            ai_reply = await ollama.generate(
-                model="llava", prompt=ai_reply, images=base64_images
-            )
-        else:
-            ai_reply = await ollama.generate(
-                model="llama2-uncensored", prompt=message.content
-            )
-
-        await message.channel.send(ai_reply)
+        await message.channel.send(ai_reply["response"])
 
 
 @bert.event
@@ -420,5 +404,5 @@ async def stop(interaction: discord.Interaction):
     )
 
 
-asyncio.run(download_ai_models(["llama2-uncensored", "llava"]))
+# asyncio.run(download_ai_models(["llama2-uncensored", "llava"]))
 bert.run(os.getenv("BOT_TOKEN"))

@@ -163,7 +163,9 @@ async def on_message(message: discord.Message):
                 if attachment.content_type.startswith("image")
             ]
             ai_reply = await ollama.generate(
-                model="llava", prompt=ai_reply, images=base64_images
+                model="llava",
+                prompt="Describe the following image(s):",
+                images=base64_images,
             )
         else:
             ai_reply = await ollama.generate(

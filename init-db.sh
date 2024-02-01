@@ -2,7 +2,7 @@
 set -e
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
-    CREATE TABLE todo (
+    CREATE TABLE todos (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         description TEXT NOT NULL,

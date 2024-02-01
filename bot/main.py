@@ -5,19 +5,21 @@ import logging
 import os
 import re
 from asyncio import sleep
-from datetime import datetime, timedelta, timezone
-from random import choice
+from datetime import datetime, timedelta
+from random import choice, randint
 from typing import List
 
 import coloredlogs
 import discord
 import feedparser
+import pytz
 import wavelink
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from ollama import AsyncClient
 
 from db import DB
+from ui.musik import AddBack, RestoreQueue
 from ui.todolist import Todolist
 
 load_dotenv()
@@ -27,6 +29,9 @@ bert = commands.Bot(
     intents=discord.Intents.all(),
     # debug_guilds=[870973430114181141, 1072785326168346706, 1182803938517455008],
 )
+
+nl_tz = pytz.timezone("Europe/Amsterdam")
+
 ollama = AsyncClient(host=os.getenv("OLLAMA_URL") or "http://ai:11434")
 
 
@@ -86,16 +91,14 @@ async def connect_nodes():
 
 @tasks.loop(hours=1)
 async def send_news_rss():
-    current_time = datetime.now(timezone.utc) + timedelta(hours=2)  # UTC+2 timezone
+    current_time = datetime.now(nl_tz)
     past_hour = current_time - timedelta(hours=1)
 
     overheid_data = feedparser.parse("https://feeds.rijksoverheid.nl/nieuws.rss")
     data = overheid_data["entries"]
     news_items_as_embeds = []
     for entry in data:
-        published_datetime = datetime(*entry["published_parsed"][:6]) + timedelta(
-            hours=2
-        )
+        published_datetime = nl_tz.localize(datetime(*entry["published_parsed"][:6]))
 
         if published_datetime >= past_hour:
             title = entry["title"]
@@ -147,7 +150,26 @@ async def on_message(message: discord.Message):
         return
 
     if isinstance(message.channel, discord.DMChannel):
-        await message.channel.send(message.content)
+        if message.content:
+            await message.channel.send(message.content)
+        return
+
+    if message.channel.name == "bert-ai":
+        if message.attachments:
+            base64_images = [
+                base64.b64encode(await attachment.read()).decode("utf-8")
+                for attachment in message.attachments
+                if attachment.content_type.startswith("image")
+            ]
+            ai_reply = await ollama.generate(
+                model="llava", prompt=ai_reply, images=base64_images
+            )
+        else:
+            ai_reply = await ollama.generate(
+                model="llama2-uncensored", prompt=message.content
+            )
+
+        await message.channel.send(ai_reply)
 
     if message.channel.name == "bert-ai":
         if message.attachments:
@@ -171,7 +193,8 @@ async def on_message(message: discord.Message):
 async def on_member_join(member: discord.Member):
     if not member.bot:
         await member.guild.system_channel.send(f"bonjour {member.mention}")
-        await member.send(f"bonjour {member.mention}")
+        with contextlib.suppress(discord.Forbidden):
+            await member.send(f"bonjour {member.mention}")
     elif bot_role := discord.utils.find(
         lambda role: role.name.lower() in ("bot", "bots"), member.guild.roles
     ):
@@ -183,7 +206,8 @@ async def on_member_join(member: discord.Member):
 async def on_member_remove(member: discord.Member):
     if not member.bot:
         await member.guild.system_channel.send(f"doeidoei {member.name}")
-        await member.send(f"doeidoei {member.name}")
+        with contextlib.suppress(discord.Forbidden):
+            await member.send(f"doeidoei {member.name}")
 
 
 @bert.event
@@ -216,7 +240,8 @@ async def on_wavelink_track_end(payload: wavelink.TrackEndEventPayload):
     if not payload.player:
         return
 
-    await payload.player.disconnect()
+    if not payload.player.queue:
+        await payload.player.disconnect()
 
 
 @bert.event
@@ -234,7 +259,7 @@ async def _bert(interaction: discord.Interaction):
 async def todo(interaction: discord.Interaction):
     """done"""
     result = DB.execute(
-        "SELECT * FROM todo WHERE guild = %s", (interaction.guild.id,)
+        "SELECT * FROM todos WHERE guild = %s", (interaction.guild.id,)
     ).fetchall()
 
     if result is None:
@@ -253,10 +278,11 @@ async def rapidlysendmessages(
 ):
     """fuck that guy"""
     we_should_follow_up = False
+    snitch = randint(0, 1) == 1
 
     if not 0 < amount <= 25:
         await interaction.response.send_message(
-            "Please choose a number between 1 and 25", ephemeral=True
+            "Please choose a number between 1 and 25", ephemeral=snitch
         )
         return
 
@@ -266,33 +292,33 @@ async def rapidlysendmessages(
         )
         await interaction.response.send_message(
             f"im not gonna message myself lets do {user.mention} instead",
-            ephemeral=True,
+            ephemeral=snitch,
         )
         we_should_follow_up = True
     elif user == interaction.user:
-        await interaction.response.send_message("if you insist i guess", ephemeral=True)
+        await interaction.response.send_message("sounds like suicide", ephemeral=snitch)
         we_should_follow_up = True
 
     if not we_should_follow_up:
         await interaction.response.send_message(
             f"Sending {amount} message{'s' if amount > 1 else ''} to {user.mention}...",
-            ephemeral=True,
+            ephemeral=snitch,
         )
     else:
         await interaction.followup.send(
             f"Sending {amount} message{'s' if amount > 1 else ''} to {user.mention}...",
-            ephemeral=True,
+            ephemeral=snitch,
         )
 
     try:
         for _ in range(amount):
             await user.send(message)
-        await interaction.followup.send("Done!", ephemeral=True)
+        await interaction.followup.send("Done!", ephemeral=snitch)
     except discord.Forbidden:
         await interaction.followup.send(
             "Could not send messages, most likely because"
             "the user has DM's from Bert blocked\n||stupid bitch||",
-            ephemeral=True,
+            ephemeral=snitch,
         )
 
 
@@ -365,8 +391,12 @@ async def skip(interaction: discord.Interaction):
         await interaction.response.send_message("Not playing anything")
         return
 
+    current_track = player.current
+
     await player.skip()
-    await interaction.response.send_message("Skipped the current song")
+    await interaction.response.send_message(
+        "Skipped the current song", view=AddBack(current_track)
+    )
 
 
 @bert.slash_command()
@@ -378,9 +408,16 @@ async def stop(interaction: discord.Interaction):
         await interaction.response.send_message("Not playing anything")
         return
 
+    current_queue = wavelink.Queue()
+    await current_queue.put_wait(player.current)
+    for track in player.queue:
+        await current_queue.put_wait(track)
+
     await player.stop()
     await player.disconnect()
-    await interaction.response.send_message("Stopped playing")
+    await interaction.response.send_message(
+        "Stopped playing", view=RestoreQueue(current_queue)
+    )
 
 
 asyncio.run(download_ai_models(["llama2-uncensored", "llava"]))

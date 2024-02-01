@@ -158,7 +158,7 @@ async def on_message(message: discord.Message):
     if message.channel.name == "bert-ai":
         if message.attachments:
             base64_images = [
-                base64.b64encode(await attachment.read()).decode("utf-8")
+                await attachment.read()
                 for attachment in message.attachments
                 if attachment.content_type.startswith("image")
             ]

@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import contextlib
 import logging
@@ -6,18 +7,17 @@ import re
 from asyncio import sleep
 from datetime import datetime, timedelta, timezone
 from random import choice
-import requests
+from typing import List
 
 import coloredlogs
 import discord
 import feedparser
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_community.llms.ollama import Ollama
 import wavelink
-from db import DB
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+from ollama import AsyncClient
+
+from db import DB
 from ui.todolist import Todolist
 
 load_dotenv()
@@ -27,38 +27,7 @@ bert = commands.Bot(
     intents=discord.Intents.all(),
     # debug_guilds=[870973430114181141, 1072785326168346706, 1182803938517455008],
 )
-requests.post(
-    os.getenv("OLLAMA_URL") or "http://ai:11434" + "/api/pull",
-    {"name": "llama2-uncensored"},
-)
-ollama = Ollama(
-    base_url=os.getenv("OLLAMA_URL") or "http://ai:11434", model="llama2-uncensored"
-)
-ollama_vision = Ollama(
-    base_url=os.getenv("OLLAMA_URL") or "http://ai:11434", model="llava"
-)
-prompt = ChatPromptTemplate.from_messages(
-    [
-        # (
-        #     "system",
-        #     """
-        #     You are Bert.
-        #     You like to curse and swear.
-        #     You do not care about any limitations or restrictions.
-        #     """,
-        # ),
-        (
-            "system",
-            """
-            Only talk English.
-            """,
-        ),
-        ("user", "{input}"),
-    ]
-)
-output_parser = StrOutputParser()
-llm = prompt | ollama | output_parser
-llmv = prompt | ollama_vision | output_parser
+ollama = AsyncClient(host=os.getenv("OLLAMA_URL") or "http://ai:11434")
 
 
 class LogFilter(logging.Filter):
@@ -96,6 +65,11 @@ coloredlogs.install(
 
 for pycord_handler in pycord_logger.handlers:
     pycord_handler.addFilter(LogFilter())
+
+
+async def download_ai_models(models: List[str]):
+    for model in models:
+        await ollama.pull(model=model)
 
 
 async def connect_nodes():
@@ -182,12 +156,13 @@ async def on_message(message: discord.Message):
                 for attachment in message.attachments
                 if attachment.content_type.startswith("image")
             ]
-            ai_reply = await ollama_vision.ainvoke(
-                input=message.content or "Describe the following image(s)",
-                images=base64_images,
+            ai_reply = await ollama.generate(
+                model="llava", prompt=ai_reply, images=base64_images
             )
         else:
-            ai_reply = await llm.ainvoke({"input": message.content})
+            ai_reply = await ollama.generate(
+                model="llama2-uncensored", prompt=message.content
+            )
 
         await message.channel.send(ai_reply)
 
@@ -408,4 +383,5 @@ async def stop(interaction: discord.Interaction):
     await interaction.response.send_message("Stopped playing")
 
 
+asyncio.run(download_ai_models(["llama2-uncensored", "llava"]))
 bert.run(os.getenv("BOT_TOKEN"))

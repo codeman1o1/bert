@@ -146,9 +146,19 @@ async def on_message(message: discord.Message):
 @bert.event
 async def on_member_join(member: discord.Member):
     if not member.bot:
-        await member.guild.system_channel.send(f"bonjour {member.mention}")
+        bonjour_msgs = (
+            "bonjour",
+            "hallo",
+            "ghello",
+            "goedendag",
+            "goeiemorgen",
+            "sinds wanneer ben jij hier",
+            "oh god daar is",
+            "d'r is er een jarig hoera hoera dat kun je wel zien dat is",
+        )
+        await member.guild.system_channel.send(f"{choice(bonjour_msgs)} {member.name}")
         with contextlib.suppress(discord.Forbidden):
-            await member.send(f"bonjour {member.mention}")
+            await member.send(f"{choice(bonjour_msgs)} {member.name}")
     elif bot_role := discord.utils.find(
         lambda role: role.name.lower() in ("bot", "bots"), member.guild.roles
     ):
@@ -159,9 +169,23 @@ async def on_member_join(member: discord.Member):
 @bert.event
 async def on_member_remove(member: discord.Member):
     if not member.bot:
-        await member.guild.system_channel.send(f"doeidoei {member.name}")
+        byebye_msgs = (
+            "doeidoei",
+            "byebye",
+            "adios",
+            "auf wiedersehen",
+            "ciao",
+            "tyf op",
+            "krijg de tyfus",
+            "kanker op",
+            "krijg kanker",
+            "krijg de tering",
+            "pleur op",
+            "stel je bent weg",
+        )
+        await member.guild.system_channel.send(f"{choice(byebye_msgs)} {member.name}")
         with contextlib.suppress(discord.Forbidden):
-            await member.send(f"doeidoei {member.name}")
+            await member.send(f"{choice(byebye_msgs)} {member.name}")
 
 
 @bert.event

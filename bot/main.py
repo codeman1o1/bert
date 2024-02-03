@@ -155,23 +155,33 @@ async def on_message(message: discord.Message):
         return
 
     if message.channel.name == "bert-ai":
-        if message.attachments:
-            base64_images = [
-                await attachment.read()
-                for attachment in message.attachments
-                if attachment.content_type.startswith("image")
-            ]
+        images = []
+        for sticker in message.stickers:
+            if sticker.format.name in ("png", "apng"):
+                images.append(await sticker.read())
+        for attachment in message.attachments:
+            if attachment.content_type.startswith("image"):
+                images.append(await attachment.read())
+        if images:
             ai_reply = await ollama.generate(
                 model="llava",
-                prompt="Describe the following image(s):",
-                images=base64_images,
+                prompt=message.content or "Describe the following image(s):",
+                images=images,
             )
         else:
             ai_reply = await ollama.generate(
                 model="llama2-uncensored", prompt=message.content
             )
 
-        await message.channel.send(ai_reply["response"])
+        if ai_reply["response"]:
+            if len(ai_reply["response"]) > 2000:
+                await message.channel.send(
+                    "_The response is too long to send in one message_"
+                )
+            else:
+                await message.channel.send(ai_reply["response"])
+        else:
+            await message.channel.send("_No response from AI_")
 
 
 @bert.event

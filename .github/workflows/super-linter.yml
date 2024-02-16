@@ -31,12 +31,8 @@ jobs:
       - name: Install Node dependencies
         run: |
           cd website
-          npm ci --omit=dev
+          npm ci
           mv node_modules ../node_modules
-
-      - name: Install Python dependencies
-        run: |
-          pip install -r ./bot/requirements.txt
 
       - name: Super-linter
         uses: super-linter/super-linter/slim@v6.0.0

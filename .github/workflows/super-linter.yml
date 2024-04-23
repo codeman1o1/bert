@@ -35,7 +35,7 @@ jobs:
           mv node_modules ../node_modules
 
       - name: Super-linter
-        uses: super-linter/super-linter/slim@v6.3.0
+        uses: super-linter/super-linter/slim@v6.4.0
         env:
           DEFAULT_BRANCH: main
           LINTER_RULES_PATH: /

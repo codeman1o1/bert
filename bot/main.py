@@ -13,11 +13,10 @@ import discord
 import feedparser
 import pytz
 import wavelink
+from db import DB
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from ollama import AsyncClient
-
-from db import DB
 from ui.musik import AddBack, RestoreQueue
 from ui.todolist import Todolist
 

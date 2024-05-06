@@ -142,6 +142,10 @@ async def on_message(message: discord.Message):
             await message.channel.send(message.content)
         return
 
+    if message.channel.name == "silence":
+        await message.delete()
+        return
+
 
 @bert.event
 async def on_member_join(member: discord.Member):

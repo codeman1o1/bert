@@ -201,7 +201,7 @@ async def on_guild_join(guild: discord.Guild):
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
 ):
-    if before.channel or not after.channel:
+    if before.channel and not after.channel:
         # If the user is the last one to leave the voice channel, disconnect the bot
         if len(before.channel.members) == 1:
             if player := member.guild.voice_client:

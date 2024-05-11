@@ -3,17 +3,17 @@ import logging
 import os
 import re
 from asyncio import sleep
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from random import choice, randint
 
 import coloredlogs
 import discord
 import feedparser
-import pytz
 import wavelink
-from db import DB
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+
+from db import DB
 from ui.musik import AddBack, RestoreQueue
 from ui.todolist import Todolist
 
@@ -24,8 +24,6 @@ bert = commands.Bot(
     intents=discord.Intents.all(),
     # debug_guilds=[870973430114181141, 1072785326168346706, 1182803938517455008],
 )
-
-nl_tz = pytz.timezone("Europe/Amsterdam")
 
 
 class LogFilter(logging.Filter):
@@ -79,29 +77,28 @@ async def connect_nodes():
 
 @tasks.loop(hours=1)
 async def send_news_rss():
-    current_time = datetime.now(nl_tz)
+    current_time = datetime.now(timezone(timedelta(hours=+2)))
     past_hour = current_time - timedelta(hours=1)
 
     overheid_data = feedparser.parse("https://feeds.rijksoverheid.nl/nieuws.rss")
     data = overheid_data["entries"]
     news_items_as_embeds = []
     for entry in data:
-        published_datetime = nl_tz.localize(datetime(*entry["published_parsed"][:6]))
-
-        if published_datetime >= past_hour:
+        published = datetime(*entry["published_parsed"][:6]).replace(tzinfo=UTC)
+        if published >= past_hour:
             title = entry["title"]
             description = entry["summary"]
             url = entry["link"]
 
+            logger.debug("Found new news item: %s", title)
             news_items_as_embeds.append(
                 discord.Embed(
                     title=title,
                     description=description,
                     url=url,
-                    timestamp=published_datetime,
+                    timestamp=published,
                 )
             )
-            logger.debug("Found new news item: %s", title)
     if news_items_as_embeds:
         news_items_as_embeds.sort(key=lambda embed: embed.timestamp)
         channels = [

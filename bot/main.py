@@ -10,10 +10,12 @@ import coloredlogs
 import discord
 import feedparser
 import pytz
+import requests
 import wavelink
-from db import DB
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+
+from db import DB
 from ui.musik import AddBack, RestoreQueue
 from ui.todolist import Todolist
 
@@ -64,6 +66,18 @@ coloredlogs.install(
 for pycord_handler in pycord_logger.handlers:
     pycord_handler.addFilter(LogFilter())
 
+events = requests.get(f"https://www.googleapis.com/calendar/v3/calendars/nl.dutch%23holiday@group.v.calendar.google.com/events?key={os.getenv("GOOGLE_API_KEY")}", timeout=5).json()["items"]
+holidays = []
+for event in events:
+    start_date = datetime.strptime(event["start"]["date"], r"%Y-%m-%d")
+    if start_date > datetime.now():
+        holidays.append({
+            "url": event["htmlLink"],
+            "summary": event["summary"],
+            "description": event["description"].split("\n")[0],
+            "start": event["start"]["date"],
+        })
+logger.info("Found %s upcoming holidays", len(holidays))
 
 async def connect_nodes():
     """Connect to our Lavalink nodes."""
@@ -115,6 +129,23 @@ async def send_news_rss():
             await channel.send(embeds=news_items_as_embeds)
             await sleep(0.1)
 
+@tasks.loop(hours=24)
+async def send_holiday():
+    today = datetime.now().date()
+    for holiday in holidays.copy():
+        holidate = datetime.strptime(holiday["start"], r"%Y-%m-%d").date()
+        if holidate > today:
+            break
+        if holidate == today:
+            embed = discord.Embed(
+                title=holiday["summary"],
+                description=holiday["description"],
+                url=holiday["url"],
+            )
+            for guild in bert.guilds:
+                await guild.system_channel.send(embed=embed)
+            holidays.remove(holiday)
+
 
 @bert.event
 async def on_ready():
@@ -130,6 +161,10 @@ async def on_ready():
     if not send_news_rss.is_running():
         logger.info("Starting RSS feed task")
         send_news_rss.start()
+
+    if not send_holiday.is_running():
+        logger.info("Starting holiday task")
+        send_holiday.start()
 
 
 @bert.event

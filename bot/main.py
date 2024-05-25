@@ -2,6 +2,7 @@ import contextlib
 import logging
 import os
 import re
+import string
 from asyncio import sleep
 from datetime import UTC, datetime, timedelta, timezone
 from random import choice, randint
@@ -21,7 +22,7 @@ load_dotenv()
 bert = commands.Bot(
     command_prefix="bert ",
     intents=discord.Intents.all(),
-    # debug_guilds=[870973430114181141, 1072785326168346706, 1182803938517455008],
+    # debug_guilds=[870973430114181141, 1182803938517455008],
 )
 
 
@@ -302,6 +303,52 @@ async def rapidlysendmessages(
             "the user has DM's from Bert blocked\n||stupid bitch||",
             ephemeral=snitch,
         )
+
+
+randomSlash = bert.create_group("random", "random thingies")
+
+
+@randomSlash.command(name="number")
+async def _number(
+    interaction: discord.Interaction, minimum: int = 0, maximum: int = 10
+):
+    """random number"""
+    if minimum > maximum:
+        minimum, maximum = maximum, minimum
+
+    await interaction.response.send_message(randint(minimum, maximum))
+
+
+@randomSlash.command(name="string")
+async def _string(interaction: discord.Interaction, length: int = 10):
+    """random string"""
+    if length > 2000:
+        await interaction.response.send_message("String length must be less than 2000")
+        return
+    if length < 1:
+        await interaction.response.send_message("String length must be greater than 0")
+        return
+    await interaction.response.send_message(
+        "".join(choice(string.ascii_letters + string.digits) for _ in range(length))
+    )
+
+
+@randomSlash.command(name="member")
+async def _member(interaction: discord.Interaction):
+    """random member"""
+    await interaction.response.send_message(choice(interaction.guild.members).mention)
+
+
+@randomSlash.command(name="role")
+async def _role(interaction: discord.Interaction):
+    """random role"""
+    await interaction.response.send_message(choice(interaction.guild.roles).mention)
+
+
+@randomSlash.command(name="channel")
+async def _channel(interaction: discord.Interaction):
+    """random channel"""
+    await interaction.response.send_message(choice(interaction.guild.channels).mention)
 
 
 @bert.slash_command()

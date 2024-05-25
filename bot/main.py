@@ -157,9 +157,9 @@ async def on_member_join(member: discord.Member):
             "oh god daar is",
             "d'r is er een jarig hoera hoera dat kun je wel zien dat is",
         )
-        await member.guild.system_channel.send(f"{choice(bonjour_msgs)} {member.name}")
+        await member.guild.system_channel.send(f"{choice(bonjour_msgs)} {member.display_name}")
         with contextlib.suppress(discord.Forbidden):
-            await member.send(f"{choice(bonjour_msgs)} {member.name}")
+            await member.send(f"{choice(bonjour_msgs)} {member.display_name}")
     elif bot_role := discord.utils.find(
         lambda role: role.name.lower() in ("bot", "bots"), member.guild.roles
     ):
@@ -184,9 +184,9 @@ async def on_member_remove(member: discord.Member):
             "pleur op",
             "stel je bent weg",
         )
-        await member.guild.system_channel.send(f"{choice(byebye_msgs)} {member.name}")
+        await member.guild.system_channel.send(f"{choice(byebye_msgs)} {member.display_name}")
         with contextlib.suppress(discord.Forbidden):
-            await member.send(f"{choice(byebye_msgs)} {member.name}")
+            await member.send(f"{choice(byebye_msgs)} {member.display_name}")
 
 
 @bert.event

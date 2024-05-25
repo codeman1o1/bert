@@ -10,10 +10,9 @@ import coloredlogs
 import discord
 import feedparser
 import wavelink
+from db import DB
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-
-from db import DB
 from ui.musik import AddBack, RestoreQueue
 from ui.todolist import Todolist
 
@@ -157,7 +156,9 @@ async def on_member_join(member: discord.Member):
             "oh god daar is",
             "d'r is er een jarig hoera hoera dat kun je wel zien dat is",
         )
-        await member.guild.system_channel.send(f"{choice(bonjour_msgs)} {member.display_name}")
+        await member.guild.system_channel.send(
+            f"{choice(bonjour_msgs)} {member.display_name}"
+        )
         with contextlib.suppress(discord.Forbidden):
             await member.send(f"{choice(bonjour_msgs)} {member.display_name}")
     elif bot_role := discord.utils.find(
@@ -184,7 +185,9 @@ async def on_member_remove(member: discord.Member):
             "pleur op",
             "stel je bent weg",
         )
-        await member.guild.system_channel.send(f"{choice(byebye_msgs)} {member.display_name}")
+        await member.guild.system_channel.send(
+            f"{choice(byebye_msgs)} {member.display_name}"
+        )
         with contextlib.suppress(discord.Forbidden):
             await member.send(f"{choice(byebye_msgs)} {member.display_name}")
 

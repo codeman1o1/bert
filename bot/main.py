@@ -6,14 +6,17 @@ import string
 from asyncio import sleep
 from datetime import UTC, datetime, timedelta, timezone
 from random import choice, randint
+from io import BytesIO
 
 import coloredlogs
 import discord
 import feedparser
+import requests
 import wavelink
 from db import DB
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+from PIL import Image, ImageDraw, ImageFont
 from ui.musik import AddBack, RestoreQueue
 from ui.todolist import Todolist
 
@@ -61,6 +64,75 @@ coloredlogs.install(
 
 for pycord_handler in pycord_logger.handlers:
     pycord_handler.addFilter(LogFilter())
+
+
+def generate_discord_screenshot(
+    display_name: str, content: str, avatar_url: str, role_color: tuple[int, int, int]
+):
+    """Generate a screenshot of a Discord message"""
+
+    # Define constants
+    font_path = "ggsans.ttf"
+    profile_pic_size = (80, 80)
+    padding = 20
+    font_size_username = 28
+    font_size_message = 32
+    bg_color = (49, 51, 56)
+    text_color = (255, 255, 255)
+
+    # Fetch avatar image from URL
+    avatar = requests.get(avatar_url, timeout=10).content
+    profile_pic = Image.open(BytesIO(avatar)).resize(profile_pic_size)
+
+    # Create a circular mask for the profile picture
+    mask = Image.new("L", profile_pic_size, 0)
+    draw_mask = ImageDraw.Draw(mask)
+    draw_mask.ellipse((0, 0, profile_pic_size[0], profile_pic_size[1]), fill=255)
+
+    # Create an image for the circular profile picture
+    profile_pic_with_alpha = Image.new("RGBA", profile_pic_size)
+    profile_pic_with_alpha.paste(profile_pic, (0, 0), mask)
+
+    # Load fonts
+    font_username = ImageFont.truetype(font_path, font_size_username)
+    font_message = ImageFont.truetype(font_path, font_size_message)
+
+    # Calculate dimensions of text and image
+    username_bbox = font_username.getbbox(display_name)
+    message_bbox = font_message.getbbox(content)
+    username_width = username_bbox[2] - username_bbox[0]
+    username_height = username_bbox[3] - username_bbox[1]
+    message_width = message_bbox[2] - message_bbox[0]
+    message_height = message_bbox[3] - message_bbox[1]
+    image_width = padding * 3 + profile_pic_size[0] + max(username_width, message_width)
+    image_height = padding * 3 + profile_pic_size[1] + message_height
+
+    # Create a blank image with the specified dimensions and background color
+    image = Image.new("RGBA", (image_width, image_height), bg_color + (255,))
+    draw = ImageDraw.Draw(image)
+
+    # Paste the profile picture onto the image
+    image.paste(profile_pic_with_alpha, (padding, padding), profile_pic_with_alpha)
+
+    # Draw the username and content text onto the image
+    draw.text(
+        (padding * 2 + profile_pic_size[0], padding),
+        display_name,
+        font=font_username,
+        fill=role_color,
+    )
+    draw.text(
+        (padding * 2 + profile_pic_size[0], padding * 2 + username_height),
+        content,
+        font=font_message,
+        fill=text_color,
+    )
+
+    # Save the image in RGBA format to maintain transparency
+    image_binary = BytesIO()
+    image.save(image_binary, format="PNG")
+    image_binary.seek(0)
+    return image_binary
 
 
 async def connect_nodes():
@@ -230,6 +302,26 @@ async def on_wavelink_track_end(payload: wavelink.TrackEndEventPayload):
 @bert.event
 async def on_wavelink_node_ready(payload: wavelink.NodeReadyEventPayload):
     logger.info("Lavalink node %s is ready", payload.node.identifier)
+
+
+@bert.message_command(name="Take screenshot")
+async def screenshot(interaction: discord.Interaction, message: discord.Message):
+    if not message.content:
+        await interaction.response.send_message("Nothing to screenshot", ephemeral=True)
+        return
+
+    image_binary = generate_discord_screenshot(
+        message.author.display_name,
+        message.content,
+        message.author.avatar.url,
+        message.author.color.to_rgb(),
+    )
+
+    await interaction.response.send_message(
+        file=discord.File(image_binary, f"{message.id}.png")
+    )
+
+    image_binary.close()
 
 
 @bert.slash_command(name="bert")

@@ -359,9 +359,13 @@ base64Slash = bert.create_group("base64", "base64 cryptology")
 @base64Slash.command(name="encode")
 async def base64_encode(interaction: discord.Interaction, text: str):
     """encode text to base64"""
-    await interaction.response.send_message(
-        base64.b64encode(text.encode()).decode("utf-8")
-    )
+    encoded = base64.b64encode(text.encode()).decode("utf-8")
+    if len(encoded) > 2000:
+        await interaction.response.send_message(
+            "Encoded string is too long to send in Discord", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(encoded)
 
 
 @base64Slash.command(name="decode")
@@ -379,9 +383,15 @@ hexSlash = bert.create_group("hex", "hexadecimal cryptology")
 
 
 @hexSlash.command(name="encode")
-async def hexencode(interaction: discord.Interaction, text: str):
+async def hex_encode(interaction: discord.Interaction, text: str):
     """encode text to hexadecimal"""
-    await interaction.response.send_message(text.encode("utf-8").hex())
+    encoded = text.encode("utf-8").hex()
+    if len(encoded) > 2000:
+        await interaction.response.send_message(
+            "Encoded string is too long to send in Discord", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(encoded)
 
 
 @hexSlash.command(name="decode")
@@ -429,9 +439,13 @@ binarySlash = bert.create_group("binary", "binary cryptology")
 @binarySlash.command(name="encode")
 async def binary_encode(interaction: discord.Interaction, text: str):
     """encode text to binary"""
-    await interaction.response.send_message(
-        " ".join(format(ord(char), "08b") for char in text)
-    )
+    encoded = " ".join(format(ord(char), "08b") for char in text)
+    if len(encoded) > 2000:
+        await interaction.response.send_message(
+            "Encoded string is too long to send in Discord", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(encoded)
 
 
 @binarySlash.command(name="decode")
@@ -451,7 +465,13 @@ decimalSlash = bert.create_group("decimal", "decimal cryptology")
 @decimalSlash.command(name="encode")
 async def decimal_encode(interaction: discord.Interaction, text: str):
     """encode text to decimal"""
-    await interaction.response.send_message(" ".join(str(ord(char)) for char in text))
+    encoded = " ".join(str(ord(char)) for char in text)
+    if len(encoded) > 2000:
+        await interaction.response.send_message(
+            "Encoded string is too long to send in Discord", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(encoded)
 
 
 @decimalSlash.command(name="decode")

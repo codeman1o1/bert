@@ -1,3 +1,6 @@
+import base64
+import binascii
+import codecs
 import contextlib
 import logging
 import os
@@ -349,6 +352,135 @@ async def _role(interaction: discord.Interaction):
 async def _channel(interaction: discord.Interaction):
     """random channel"""
     await interaction.response.send_message(choice(interaction.guild.channels).mention)
+
+
+base64Slash = bert.create_group("base64", "base64 cryptology")
+
+
+@base64Slash.command(name="encode")
+async def base64_encode(interaction: discord.Interaction, text: str):
+    """encode text to base64"""
+    await interaction.response.send_message(
+        base64.b64encode(text.encode()).decode("utf-8")
+    )
+
+
+@base64Slash.command(name="decode")
+async def base64_decode(interaction: discord.Interaction, text: str):
+    """decode base64 to text"""
+    try:
+        decoded = base64.b64decode(text.encode("utf-8")).decode("utf-8")
+    except binascii.Error:
+        await interaction.response.send_message("Invalid base64 string", ephemeral=True)
+        return
+    await interaction.response.send_message(decoded)
+
+
+hexSlash = bert.create_group("hex", "hexadecimal cryptology")
+
+
+@hexSlash.command(name="encode")
+async def hexencode(interaction: discord.Interaction, text: str):
+    """encode text to hexadecimal"""
+    await interaction.response.send_message(text.encode("utf-8").hex())
+
+
+@hexSlash.command(name="decode")
+async def hex_decode(interaction: discord.Interaction, text: str):
+    """decode hexadecimal to text"""
+    try:
+        decoded = bytes.fromhex(text).decode("utf-8")
+    except ValueError:
+        await interaction.response.send_message(
+            "Invalid hexadecimal string", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(decoded)
+
+
+caesarSlash = bert.create_group("caesar", "caesar cryptology")
+
+
+def caesar(text: str, shift: int):
+    return "".join(
+        (
+            chr((ord(char) - 65 + shift) % 26 + 65)
+            if char.isupper()
+            else chr((ord(char) - 97 + shift) % 26 + 97) if char.islower() else char
+        )
+        for char in text
+    )
+
+
+@caesarSlash.command(name="encode")
+async def caesar_encode(interaction: discord.Interaction, text: str, shift: int):
+    """encode text to caesar"""
+    await interaction.response.send_message(caesar(text, shift))
+
+
+@caesarSlash.command(name="decode")
+async def caesar_decode(interaction: discord.Interaction, text: str, shift: int):
+    """decode caesar to text"""
+    await interaction.response.send_message(caesar(text, -shift))
+
+
+binarySlash = bert.create_group("binary", "binary cryptology")
+
+
+@binarySlash.command(name="encode")
+async def binary_encode(interaction: discord.Interaction, text: str):
+    """encode text to binary"""
+    await interaction.response.send_message(
+        " ".join(format(ord(char), "08b") for char in text)
+    )
+
+
+@binarySlash.command(name="decode")
+async def binary_decode(interaction: discord.Interaction, text: str):
+    """decode binary to text"""
+    try:
+        decoded = "".join(chr(int(char, 2)) for char in text.split())
+    except (OverflowError, ValueError):
+        await interaction.response.send_message("Invalid binary string", ephemeral=True)
+        return
+    await interaction.response.send_message(decoded)
+
+
+decimalSlash = bert.create_group("decimal", "decimal cryptology")
+
+
+@decimalSlash.command(name="encode")
+async def decimal_encode(interaction: discord.Interaction, text: str):
+    """encode text to decimal"""
+    await interaction.response.send_message(" ".join(str(ord(char)) for char in text))
+
+
+@decimalSlash.command(name="decode")
+async def decimal_decode(interaction: discord.Interaction, text: str):
+    """decode decimal to text"""
+    try:
+        decoded = "".join(chr(int(char)) for char in text.split())
+    except (OverflowError, ValueError):
+        await interaction.response.send_message(
+            "Invalid decimal string", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(decoded)
+
+
+rot13Slash = bert.create_group("rot13", "rot13 cryptology")
+
+
+@rot13Slash.command(name="encode")
+async def rot13_encode(interaction: discord.Interaction, text: str):
+    """encode text to rot13"""
+    await interaction.response.send_message(codecs.encode(text, "rot_13"))
+
+
+@rot13Slash.command(name="decode")
+async def rot13_decode(interaction: discord.Interaction, text: str):
+    """decode rot13 to text"""
+    await interaction.response.send_message(codecs.decode(text, "rot_13"))
 
 
 @bert.slash_command()

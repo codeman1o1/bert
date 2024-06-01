@@ -1,6 +1,5 @@
 import base64
 import binascii
-import codecs
 import contextlib
 import logging
 import os
@@ -466,21 +465,6 @@ async def decimal_decode(interaction: discord.Interaction, text: str):
         )
         return
     await interaction.response.send_message(decoded)
-
-
-rot13Slash = bert.create_group("rot13", "rot13 cryptology")
-
-
-@rot13Slash.command(name="encode")
-async def rot13_encode(interaction: discord.Interaction, text: str):
-    """encode text to rot13"""
-    await interaction.response.send_message(codecs.encode(text, "rot_13"))
-
-
-@rot13Slash.command(name="decode")
-async def rot13_decode(interaction: discord.Interaction, text: str):
-    """decode rot13 to text"""
-    await interaction.response.send_message(codecs.decode(text, "rot_13"))
 
 
 @bert.slash_command()

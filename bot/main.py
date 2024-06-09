@@ -487,9 +487,24 @@ async def decimal_decode(interaction: discord.Interaction, text: str):
     await interaction.response.send_message(decoded)
 
 
+async def get_videos(ctx: discord.AutocompleteContext):
+    if not ctx.value:
+        return []
+    try:
+        tracks = await wavelink.Playable.search(ctx.value)
+    except wavelink.exceptions.LavalinkLoadException:
+        return []
+    return [
+        discord.OptionChoice(f"{track.title} - {track.author}"[:100], track.uri)
+        for track in tracks
+    ]
+
+
 @bert.slash_command()
 async def play(
-    interaction: discord.Interaction, query: str, channel: discord.VoiceChannel = None
+    interaction: discord.Interaction,
+    query: discord.Option(str, autocomplete=get_videos),
+    channel: discord.VoiceChannel = None,
 ):
     """Play a song or playlist"""
     if not interaction.user.voice and not channel:

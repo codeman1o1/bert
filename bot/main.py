@@ -151,7 +151,8 @@ async def send_holiday():
                 url=holiday["url"],
             )
             for guild in bert.guilds:
-                await guild.system_channel.send(embed=embed)
+                if guild.system_channel:
+                    await guild.system_channel.send(embed=embed)
             holidays.remove(holiday)
 
 

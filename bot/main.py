@@ -67,18 +67,24 @@ coloredlogs.install(
 for pycord_handler in pycord_logger.handlers:
     pycord_handler.addFilter(LogFilter())
 
-events = requests.get(f"https://www.googleapis.com/calendar/v3/calendars/nl.dutch%23holiday@group.v.calendar.google.com/events?key={os.getenv("GOOGLE_API_KEY")}", timeout=5).json()["items"]
+events = requests.get(
+    f"https://www.googleapis.com/calendar/v3/calendars/nl.dutch%23holiday@group.v.calendar.google.com/events?key={os.getenv('GOOGLE_API_KEY')}",
+    timeout=5,
+).json()["items"]
 holidays = []
 for event in events:
     start_date = datetime.strptime(event["start"]["date"], r"%Y-%m-%d")
     if start_date > datetime.now():
-        holidays.append({
-            "url": event["htmlLink"],
-            "summary": event["summary"],
-            "description": event["description"].split("\n")[0],
-            "start": event["start"]["date"],
-        })
+        holidays.append(
+            {
+                "url": event["htmlLink"],
+                "summary": event["summary"],
+                "description": event["description"].split("\n")[0],
+                "start": event["start"]["date"],
+            }
+        )
 logger.info("Found %s upcoming holidays", len(holidays))
+
 
 async def connect_nodes():
     """Connect to our Lavalink nodes."""
@@ -129,6 +135,7 @@ async def send_news_rss():
         for channel in channels:
             await channel.send(embeds=news_items_as_embeds)
             await sleep(0.1)
+
 
 @tasks.loop(time=time(hour=12, minute=00, tzinfo=ZoneInfo("Europe/Amsterdam")))
 async def send_holiday():

@@ -28,7 +28,7 @@ bert = commands.Bot(
     # debug_guilds=[870973430114181141, 1072785326168346706, 1182803938517455008],
 )
 
-nl_tz = pytz.timezone("Europe/Amsterdam")
+nl_tz = pytz.timezone(os.getenv("TZ"))
 
 
 class LogFilter(logging.Filter):
@@ -143,7 +143,7 @@ async def send_news_rss():
             await sleep(0.1)
 
 
-@tasks.loop(time=time(hour=12, minute=00, tzinfo=ZoneInfo("Europe/Amsterdam")))
+@tasks.loop(time=time(hour=12, minute=00, tzinfo=ZoneInfo(os.getenv("TZ"))))
 async def send_holiday():
     today = datetime.now().date()
     for holiday in holidays.copy():

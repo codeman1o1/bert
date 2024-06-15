@@ -69,7 +69,7 @@ for pycord_handler in pycord_logger.handlers:
 
 events = requests.get(
     f"https://www.googleapis.com/calendar/v3/calendars/nl.dutch%23holiday@group.v.calendar.google.com/events?key={os.getenv('GOOGLE_API_KEY')}",
-    timeout=5,
+    timeout=10,
 ).json()["items"]
 holidays = []
 for event in events:

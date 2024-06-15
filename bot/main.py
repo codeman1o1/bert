@@ -3,8 +3,9 @@ import logging
 import os
 import re
 from asyncio import sleep
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from random import choice, randint
+from zoneinfo import ZoneInfo
 
 import coloredlogs
 import discord
@@ -129,7 +130,7 @@ async def send_news_rss():
             await channel.send(embeds=news_items_as_embeds)
             await sleep(0.1)
 
-@tasks.loop(hours=24)
+@tasks.loop(time=time(hour=12, minute=00, tzinfo=ZoneInfo("Europe/Amsterdam")))
 async def send_holiday():
     today = datetime.now().date()
     for holiday in holidays.copy():

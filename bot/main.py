@@ -67,10 +67,16 @@ coloredlogs.install(
 for pycord_handler in pycord_logger.handlers:
     pycord_handler.addFilter(LogFilter())
 
-events = requests.get(
-    f"https://www.googleapis.com/calendar/v3/calendars/nl.dutch%23holiday@group.v.calendar.google.com/events?key={os.getenv('GOOGLE_API_KEY')}",
-    timeout=10,
-).json()["items"]
+events = []
+try:
+    res = requests.get(
+        f"https://www.googleapis.com/calendar/v3/calendars/nl.dutch%23holiday@group.v.calendar.google.com/events?key={os.getenv('GOOGLE_API_KEY')}",
+        timeout=10,
+    )
+    res.raise_for_status()
+    events = res.json()["items"]
+except requests.exceptions.RequestException as error:
+    logger.error("Failed to fetch holidays: %s", error)
 holidays = []
 for event in events:
     start_date = datetime.strptime(event["start"]["date"], r"%Y-%m-%d")

@@ -1,16 +1,18 @@
+import base64
+import binascii
 import contextlib
 import logging
 import os
 import re
+import string
 from asyncio import sleep
-from datetime import datetime, timedelta, time
+from datetime import UTC, datetime, timedelta, time
 from random import choice, randint
 from zoneinfo import ZoneInfo
 
 import coloredlogs
 import discord
 import feedparser
-import pytz
 import requests
 import wavelink
 from discord.ext import commands, tasks
@@ -25,10 +27,8 @@ load_dotenv()
 bert = commands.Bot(
     command_prefix="bert ",
     intents=discord.Intents.all(),
-    # debug_guilds=[870973430114181141, 1072785326168346706, 1182803938517455008],
+    # debug_guilds=[870973430114181141, 1182803938517455008],
 )
-
-nl_tz = pytz.timezone(os.getenv("TZ"))
 
 
 class LogFilter(logging.Filter):
@@ -106,29 +106,28 @@ async def connect_nodes():
 
 @tasks.loop(hours=1)
 async def send_news_rss():
-    current_time = datetime.now(nl_tz)
+    current_time = datetime.now(ZoneInfo("Europe/Amsterdam"))
     past_hour = current_time - timedelta(hours=1)
 
     overheid_data = feedparser.parse("https://feeds.rijksoverheid.nl/nieuws.rss")
     data = overheid_data["entries"]
     news_items_as_embeds = []
     for entry in data:
-        published_datetime = nl_tz.localize(datetime(*entry["published_parsed"][:6]))
-
-        if published_datetime >= past_hour:
+        published = datetime(*entry["published_parsed"][:6]).replace(tzinfo=UTC)
+        if published >= past_hour:
             title = entry["title"]
             description = entry["summary"]
             url = entry["link"]
 
+            logger.debug("Found new news item: %s", title)
             news_items_as_embeds.append(
                 discord.Embed(
                     title=title,
                     description=description,
                     url=url,
-                    timestamp=published_datetime,
+                    timestamp=published,
                 )
             )
-            logger.debug("Found new news item: %s", title)
     if news_items_as_embeds:
         news_items_as_embeds.sort(key=lambda embed: embed.timestamp)
         channels = [
@@ -210,9 +209,11 @@ async def on_member_join(member: discord.Member):
             "oh god daar is",
             "d'r is er een jarig hoera hoera dat kun je wel zien dat is",
         )
-        await member.guild.system_channel.send(f"{choice(bonjour_msgs)} {member.name}")
+        await member.guild.system_channel.send(
+            f"{choice(bonjour_msgs)} {member.display_name}"
+        )
         with contextlib.suppress(discord.Forbidden):
-            await member.send(f"{choice(bonjour_msgs)} {member.name}")
+            await member.send(f"{choice(bonjour_msgs)} {member.display_name}")
     elif bot_role := discord.utils.find(
         lambda role: role.name.lower() in ("bot", "bots"), member.guild.roles
     ):
@@ -237,9 +238,11 @@ async def on_member_remove(member: discord.Member):
             "pleur op",
             "stel je bent weg",
         )
-        await member.guild.system_channel.send(f"{choice(byebye_msgs)} {member.name}")
+        await member.guild.system_channel.send(
+            f"{choice(byebye_msgs)} {member.display_name}"
+        )
         with contextlib.suppress(discord.Forbidden):
-            await member.send(f"{choice(byebye_msgs)} {member.name}")
+            await member.send(f"{choice(byebye_msgs)} {member.display_name}")
 
 
 @bert.event
@@ -354,9 +357,204 @@ async def rapidlysendmessages(
         )
 
 
+randomSlash = bert.create_group("random", "random thingies")
+
+
+@randomSlash.command(name="number")
+async def _number(
+    interaction: discord.Interaction, minimum: int = 0, maximum: int = 10
+):
+    """random number"""
+    if minimum > maximum:
+        minimum, maximum = maximum, minimum
+
+    await interaction.response.send_message(randint(minimum, maximum))
+
+
+@randomSlash.command(name="string")
+async def _string(interaction: discord.Interaction, length: int = 10):
+    """random string"""
+    if length > 2000:
+        await interaction.response.send_message("String length must be less than 2000")
+        return
+    if length < 1:
+        await interaction.response.send_message("String length must be greater than 0")
+        return
+    await interaction.response.send_message(
+        "".join(choice(string.ascii_letters + string.digits) for _ in range(length))
+    )
+
+
+@randomSlash.command(name="member")
+async def _member(interaction: discord.Interaction):
+    """random member"""
+    await interaction.response.send_message(choice(interaction.guild.members).mention)
+
+
+@randomSlash.command(name="role")
+async def _role(interaction: discord.Interaction):
+    """random role"""
+    await interaction.response.send_message(choice(interaction.guild.roles).mention)
+
+
+@randomSlash.command(name="channel")
+async def _channel(interaction: discord.Interaction):
+    """random channel"""
+    await interaction.response.send_message(choice(interaction.guild.channels).mention)
+
+
+base64Slash = bert.create_group("base64", "base64 cryptology")
+
+
+@base64Slash.command(name="encode")
+async def base64_encode(interaction: discord.Interaction, text: str):
+    """encode text to base64"""
+    encoded = base64.b64encode(text.encode()).decode("utf-8")
+    if len(encoded) > 2000:
+        await interaction.response.send_message(
+            "Encoded string is too long to send in Discord", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(encoded)
+
+
+@base64Slash.command(name="decode")
+async def base64_decode(interaction: discord.Interaction, text: str):
+    """decode base64 to text"""
+    try:
+        decoded = base64.b64decode(text.encode("utf-8")).decode("utf-8")
+    except binascii.Error:
+        await interaction.response.send_message("Invalid base64 string", ephemeral=True)
+        return
+    await interaction.response.send_message(decoded)
+
+
+hexSlash = bert.create_group("hex", "hexadecimal cryptology")
+
+
+@hexSlash.command(name="encode")
+async def hex_encode(interaction: discord.Interaction, text: str):
+    """encode text to hexadecimal"""
+    encoded = text.encode("utf-8").hex()
+    if len(encoded) > 2000:
+        await interaction.response.send_message(
+            "Encoded string is too long to send in Discord", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(encoded)
+
+
+@hexSlash.command(name="decode")
+async def hex_decode(interaction: discord.Interaction, text: str):
+    """decode hexadecimal to text"""
+    try:
+        decoded = bytes.fromhex(text).decode("utf-8")
+    except ValueError:
+        await interaction.response.send_message(
+            "Invalid hexadecimal string", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(decoded)
+
+
+caesarSlash = bert.create_group("caesar", "caesar cryptology")
+
+
+def caesar(text: str, shift: int):
+    return "".join(
+        (
+            chr((ord(char) - 65 + shift) % 26 + 65)
+            if char.isupper()
+            else chr((ord(char) - 97 + shift) % 26 + 97) if char.islower() else char
+        )
+        for char in text
+    )
+
+
+@caesarSlash.command(name="encode")
+async def caesar_encode(interaction: discord.Interaction, text: str, shift: int):
+    """encode text to caesar"""
+    await interaction.response.send_message(caesar(text, shift))
+
+
+@caesarSlash.command(name="decode")
+async def caesar_decode(interaction: discord.Interaction, text: str, shift: int):
+    """decode caesar to text"""
+    await interaction.response.send_message(caesar(text, -shift))
+
+
+binarySlash = bert.create_group("binary", "binary cryptology")
+
+
+@binarySlash.command(name="encode")
+async def binary_encode(interaction: discord.Interaction, text: str):
+    """encode text to binary"""
+    encoded = " ".join(format(ord(char), "08b") for char in text)
+    if len(encoded) > 2000:
+        await interaction.response.send_message(
+            "Encoded string is too long to send in Discord", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(encoded)
+
+
+@binarySlash.command(name="decode")
+async def binary_decode(interaction: discord.Interaction, text: str):
+    """decode binary to text"""
+    try:
+        decoded = "".join(chr(int(char, 2)) for char in text.split())
+    except (OverflowError, ValueError):
+        await interaction.response.send_message("Invalid binary string", ephemeral=True)
+        return
+    await interaction.response.send_message(decoded)
+
+
+decimalSlash = bert.create_group("decimal", "decimal cryptology")
+
+
+@decimalSlash.command(name="encode")
+async def decimal_encode(interaction: discord.Interaction, text: str):
+    """encode text to decimal"""
+    encoded = " ".join(str(ord(char)) for char in text)
+    if len(encoded) > 2000:
+        await interaction.response.send_message(
+            "Encoded string is too long to send in Discord", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(encoded)
+
+
+@decimalSlash.command(name="decode")
+async def decimal_decode(interaction: discord.Interaction, text: str):
+    """decode decimal to text"""
+    try:
+        decoded = "".join(chr(int(char)) for char in text.split())
+    except (OverflowError, ValueError):
+        await interaction.response.send_message(
+            "Invalid decimal string", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(decoded)
+
+
+async def get_videos(ctx: discord.AutocompleteContext):
+    if not ctx.value:
+        return []
+    try:
+        tracks = await wavelink.Playable.search(ctx.value)
+    except wavelink.exceptions.LavalinkLoadException:
+        return []
+    return [
+        discord.OptionChoice(f"{track.title} - {track.author}"[:100], track.uri)
+        for track in tracks
+    ]
+
+
 @bert.slash_command()
 async def play(
-    interaction: discord.Interaction, query: str, channel: discord.VoiceChannel = None
+    interaction: discord.Interaction,
+    query: discord.Option(str, autocomplete=get_videos),
+    channel: discord.VoiceChannel = None,
 ):
     """Play a song or playlist"""
     if not interaction.user.voice and not channel:

@@ -30,6 +30,8 @@ bert = commands.Bot(
     # debug_guilds=[870973430114181141, 1182803938517455008],
 )
 
+TZ = ZoneInfo(os.getenv("TZ"))
+
 
 class LogFilter(logging.Filter):
     def filter(self, record: logging.LogRecord):
@@ -79,8 +81,8 @@ except requests.exceptions.RequestException as error:
     logger.error("Failed to fetch holidays: %s", error)
 holidays = []
 for event in events:
-    start_date = datetime.strptime(event["start"]["date"], r"%Y-%m-%d")
-    if start_date > datetime.now():
+    start_date = datetime.strptime(event["start"]["date"], r"%Y-%m-%d").date()
+    if start_date >= datetime.now().date():
         holidays.append(
             {
                 "url": event["htmlLink"],
@@ -106,14 +108,13 @@ async def connect_nodes():
 
 @tasks.loop(hours=1)
 async def send_news_rss():
-    current_time = datetime.now(ZoneInfo("Europe/Amsterdam"))
-    past_hour = current_time - timedelta(hours=1)
+    past_hour = datetime.now(TZ) - timedelta(hours=1)
 
     overheid_data = feedparser.parse("https://feeds.rijksoverheid.nl/nieuws.rss")
     data = overheid_data["entries"]
     news_items_as_embeds = []
     for entry in data:
-        published = datetime(*entry["published_parsed"][:6]).replace(tzinfo=UTC)
+        published = datetime(*entry["published_parsed"][:6], tzinfo=UTC)
         if published >= past_hour:
             title = entry["title"]
             description = entry["summary"]
@@ -142,7 +143,7 @@ async def send_news_rss():
             await sleep(0.1)
 
 
-@tasks.loop(time=time(hour=12, minute=00, tzinfo=ZoneInfo(os.getenv("TZ"))))
+@tasks.loop(time=time(hour=12, minute=00, tzinfo=TZ))
 async def send_holiday():
     today = datetime.now().date()
     for holiday in holidays.copy():

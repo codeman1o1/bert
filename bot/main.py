@@ -6,8 +6,9 @@ import os
 import re
 import string
 from asyncio import sleep
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from random import choice, randint
+from zoneinfo import ZoneInfo
 
 import coloredlogs
 import discord
@@ -79,7 +80,7 @@ async def connect_nodes():
 
 @tasks.loop(hours=1)
 async def send_news_rss():
-    current_time = datetime.now(timezone(timedelta(hours=+2)))
+    current_time = datetime.now(ZoneInfo("Europe/Amsterdam"))
     past_hour = current_time - timedelta(hours=1)
 
     overheid_data = feedparser.parse("https://feeds.rijksoverheid.nl/nieuws.rss")

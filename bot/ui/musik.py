@@ -12,9 +12,9 @@ class MusicView(discord.ui.View):
 
 
 class AddBack(MusicView):
-    def __init__(self, track):
+    def __init__(self, track: wavelink.Playable):
         super().__init__()
-        self.track: wavelink.Playable = track
+        self.track = track
 
     @discord.ui.button(label="Add back", style=discord.ButtonStyle.green, emoji="🔙")
     async def add_back(
@@ -32,9 +32,9 @@ class AddBack(MusicView):
 
 
 class RestoreQueue(MusicView):
-    def __init__(self, queue):
+    def __init__(self, queue: wavelink.Queue):
         super().__init__()
-        self.queue: wavelink.Queue = queue
+        self.queue = queue
 
     @discord.ui.button(label="Restore", style=discord.ButtonStyle.green, emoji="♻️")
     async def restore(

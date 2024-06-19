@@ -69,9 +69,11 @@ for pycord_handler in pycord_logger.handlers:
     pycord_handler.addFilter(LogFilter())
 
 events = []
+CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3/calendars"
+CALENDAR_HOLIDAY = r"nl.dutch%23holiday@group.v.calendar.google.com"
 try:
     res = requests.get(
-        f"https://www.googleapis.com/calendar/v3/calendars/nl.dutch%23holiday@group.v.calendar.google.com/events?key={os.getenv('GOOGLE_API_KEY')}",
+        f"{CALENDAR_BASE_URL}/{CALENDAR_HOLIDAY}/events?key={os.getenv('GOOGLE_API_KEY')}",
         timeout=10,
     )
     res.raise_for_status()

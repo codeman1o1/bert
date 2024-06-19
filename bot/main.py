@@ -16,6 +16,7 @@ import feedparser
 import wavelink
 from db import DB
 from discord.ext import commands, tasks
+from discord.commands import option
 from dotenv import load_dotenv
 from ui.musik import AddBack, RestoreQueue
 from ui.todolist import Todolist
@@ -259,6 +260,9 @@ async def todo(interaction: discord.Interaction):
 
 
 @bert.slash_command()
+@option("user", description="The user to send messages to")
+@option("message", description="The message to send")
+@option("amount", description="The amount of messages to send")
 async def rapidlysendmessages(
     interaction: discord.Interaction, user: discord.Member, message: str, amount: int
 ):
@@ -312,6 +316,8 @@ randomSlash = bert.create_group("random", "random thingies")
 
 
 @randomSlash.command(name="number")
+@option("minimum", description="the least it can generate (default: 0)")
+@option("maximum", description="the most it can generate (default: 10)")
 async def _number(
     interaction: discord.Interaction, minimum: int = 0, maximum: int = 10
 ):
@@ -323,6 +329,7 @@ async def _number(
 
 
 @randomSlash.command(name="string")
+@option("length", description="how long the text should be (default: 10)")
 async def _string(interaction: discord.Interaction, length: int = 10):
     """random string"""
     if length > 2000:
@@ -358,6 +365,7 @@ base64Slash = bert.create_group("base64", "base64 cryptology")
 
 
 @base64Slash.command(name="encode")
+@option("text", description="the text")
 async def base64_encode(interaction: discord.Interaction, text: str):
     """encode text to base64"""
     encoded = base64.b64encode(text.encode()).decode("utf-8")
@@ -370,6 +378,7 @@ async def base64_encode(interaction: discord.Interaction, text: str):
 
 
 @base64Slash.command(name="decode")
+@option("text", description="the text")
 async def base64_decode(interaction: discord.Interaction, text: str):
     """decode base64 to text"""
     try:
@@ -384,6 +393,7 @@ hexSlash = bert.create_group("hex", "hexadecimal cryptology")
 
 
 @hexSlash.command(name="encode")
+@option("text", description="the text")
 async def hex_encode(interaction: discord.Interaction, text: str):
     """encode text to hexadecimal"""
     encoded = text.encode("utf-8").hex()
@@ -396,6 +406,7 @@ async def hex_encode(interaction: discord.Interaction, text: str):
 
 
 @hexSlash.command(name="decode")
+@option("text", description="the text")
 async def hex_decode(interaction: discord.Interaction, text: str):
     """decode hexadecimal to text"""
     try:
@@ -412,6 +423,7 @@ caesarSlash = bert.create_group("caesar", "caesar cryptology")
 
 
 def caesar(text: str, shift: int):
+    """Caesar cipher implementation"""
     return "".join(
         (
             chr((ord(char) - 65 + shift) % 26 + 65)
@@ -423,12 +435,16 @@ def caesar(text: str, shift: int):
 
 
 @caesarSlash.command(name="encode")
+@option("text", description="the text")
+@option("shift", description="displacement amount")
 async def caesar_encode(interaction: discord.Interaction, text: str, shift: int):
     """encode text to caesar"""
     await interaction.response.send_message(caesar(text, shift))
 
 
 @caesarSlash.command(name="decode")
+@option("text", description="the text")
+@option("shift", description="displacement amount")
 async def caesar_decode(interaction: discord.Interaction, text: str, shift: int):
     """decode caesar to text"""
     await interaction.response.send_message(caesar(text, -shift))
@@ -438,6 +454,7 @@ binarySlash = bert.create_group("binary", "binary cryptology")
 
 
 @binarySlash.command(name="encode")
+@option("text", description="the text")
 async def binary_encode(interaction: discord.Interaction, text: str):
     """encode text to binary"""
     encoded = " ".join(format(ord(char), "08b") for char in text)
@@ -450,6 +467,7 @@ async def binary_encode(interaction: discord.Interaction, text: str):
 
 
 @binarySlash.command(name="decode")
+@option("text", description="the text")
 async def binary_decode(interaction: discord.Interaction, text: str):
     """decode binary to text"""
     try:
@@ -464,6 +482,7 @@ decimalSlash = bert.create_group("decimal", "decimal cryptology")
 
 
 @decimalSlash.command(name="encode")
+@option("text", description="the text")
 async def decimal_encode(interaction: discord.Interaction, text: str):
     """encode text to decimal"""
     encoded = " ".join(str(ord(char)) for char in text)
@@ -476,6 +495,7 @@ async def decimal_encode(interaction: discord.Interaction, text: str):
 
 
 @decimalSlash.command(name="decode")
+@option("text", description="the text")
 async def decimal_decode(interaction: discord.Interaction, text: str):
     """decode decimal to text"""
     try:
@@ -489,6 +509,7 @@ async def decimal_decode(interaction: discord.Interaction, text: str):
 
 
 async def get_videos(ctx: discord.AutocompleteContext):
+    """search for videos"""
     if not ctx.value:
         return []
     try:
@@ -502,9 +523,11 @@ async def get_videos(ctx: discord.AutocompleteContext):
 
 
 @bert.slash_command()
+@option("query", description="what to search for", autocomplete=get_videos)
+@option("channel", description="the voice channel to join (default: yours)")
 async def play(
-    interaction: discord.Interaction,
-    query: discord.Option(str, autocomplete=get_videos),
+    interaction: discord.ApplicationContext,
+    query: str,
     channel: discord.VoiceChannel = None,
 ):
     """Play a song or playlist"""

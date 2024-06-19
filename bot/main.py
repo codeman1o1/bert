@@ -6,13 +6,14 @@ import os
 import re
 import string
 from asyncio import sleep
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from random import choice, randint
 from zoneinfo import ZoneInfo
 
 import coloredlogs
 import discord
 import feedparser
+import requests
 import wavelink
 from db import DB
 from discord.commands import option
@@ -28,6 +29,8 @@ bert = commands.Bot(
     intents=discord.Intents.all(),
     # debug_guilds=[870973430114181141, 1182803938517455008],
 )
+
+TZ = ZoneInfo(os.getenv("TZ") or "Europe/Amsterdam")
 
 
 class LogFilter(logging.Filter):
@@ -66,6 +69,32 @@ coloredlogs.install(
 for pycord_handler in pycord_logger.handlers:
     pycord_handler.addFilter(LogFilter())
 
+events = []
+CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3/calendars"
+CALENDAR_HOLIDAY = r"nl.dutch%23holiday@group.v.calendar.google.com"
+try:
+    res = requests.get(
+        f"{CALENDAR_BASE_URL}/{CALENDAR_HOLIDAY}/events?key={os.getenv('GOOGLE_API_KEY')}",
+        timeout=10,
+    )
+    res.raise_for_status()
+    events = res.json()["items"]
+except requests.exceptions.RequestException as error:
+    logger.error("Failed to fetch holidays: %s", error)
+holidays = []
+for event in events:
+    start_date = datetime.strptime(event["start"]["date"], r"%Y-%m-%d").date()
+    if start_date >= datetime.now().date():
+        holidays.append(
+            {
+                "url": event["htmlLink"],
+                "summary": event["summary"],
+                "description": event["description"].split("\n")[0],
+                "start": event["start"]["date"],
+            }
+        )
+logger.info("Found %s upcoming holidays", len(holidays))
+
 
 async def connect_nodes():
     """Connect to our Lavalink nodes."""
@@ -81,14 +110,13 @@ async def connect_nodes():
 
 @tasks.loop(hours=1)
 async def send_news_rss():
-    current_time = datetime.now(ZoneInfo("Europe/Amsterdam"))
-    past_hour = current_time - timedelta(hours=1)
+    past_hour = datetime.now(TZ) - timedelta(hours=1)
 
     overheid_data = feedparser.parse("https://feeds.rijksoverheid.nl/nieuws.rss")
     data = overheid_data["entries"]
     news_items_as_embeds = []
     for entry in data:
-        published = datetime(*entry["published_parsed"][:6]).replace(tzinfo=UTC)
+        published = datetime(*entry["published_parsed"][:6], tzinfo=UTC)
         if published >= past_hour:
             title = entry["title"]
             description = entry["summary"]
@@ -117,6 +145,25 @@ async def send_news_rss():
             await sleep(0.1)
 
 
+@tasks.loop(time=time(hour=12, minute=00, tzinfo=TZ))
+async def send_holiday():
+    today = datetime.now().date()
+    for holiday in holidays.copy():
+        holidate = datetime.strptime(holiday["start"], r"%Y-%m-%d").date()
+        if holidate > today:
+            break
+        if holidate == today:
+            embed = discord.Embed(
+                title=holiday["summary"],
+                description=holiday["description"],
+                url=holiday["url"],
+            )
+            for guild in bert.guilds:
+                if guild.system_channel:
+                    await guild.system_channel.send(embed=embed)
+            holidays.remove(holiday)
+
+
 @bert.event
 async def on_ready():
     logger.info("%s is ready to hurt your brain", bert.user.name)
@@ -131,6 +178,10 @@ async def on_ready():
     if not send_news_rss.is_running():
         logger.info("Starting RSS feed task")
         send_news_rss.start()
+
+    if not send_holiday.is_running():
+        logger.info("Starting holiday task")
+        send_holiday.start()
 
 
 @bert.event

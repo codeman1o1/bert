@@ -10,7 +10,7 @@ RUN apk add --no-cache gcc libc-dev libffi-dev
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r ./requirements.txt
 # Wavelink is dependant on discord.py, so we need to uninstall it and install py-cord
-RUN pip uninstall discord.py py-cord -y && pip install --no-cache-dir py-cord[voice]==$(grep 'py-cord\[voice\]' requirements.txt | awk -F'==' '{print $2}')
+RUN pip uninstall discord.py py-cord -y && pip install --no-cache-dir "py-cord[voice]==$(grep 'py-cord\[voice\]' requirements.txt | awk -F'==' '{print $2}')"
 
 COPY . .
 

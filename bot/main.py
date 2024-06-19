@@ -561,8 +561,6 @@ async def decimal_decode(interaction: discord.Interaction, text: str):
 
 async def get_videos(ctx: discord.AutocompleteContext):
     """search for videos"""
-    if not ctx.value:
-        return []
     try:
         tracks = await wavelink.Playable.search(ctx.value)
     except wavelink.exceptions.LavalinkLoadException:

@@ -29,7 +29,7 @@ bert = commands.Bot(
     # debug_guilds=[870973430114181141, 1182803938517455008],
 )
 
-TZ = ZoneInfo(os.getenv("TZ"))
+TZ = ZoneInfo(os.getenv("TZ") or "Europe/Amsterdam")
 
 
 class LogFilter(logging.Filter):

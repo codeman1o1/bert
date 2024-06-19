@@ -6,15 +6,17 @@ import os
 import re
 import string
 from asyncio import sleep
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from random import choice, randint
 from zoneinfo import ZoneInfo
 
 import coloredlogs
 import discord
 import feedparser
+import requests
 import wavelink
 from db import DB
+from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from ui.musik import AddBack, RestoreQueue
@@ -27,6 +29,8 @@ bert = commands.Bot(
     intents=discord.Intents.all(),
     # debug_guilds=[870973430114181141, 1182803938517455008],
 )
+
+TZ = ZoneInfo(os.getenv("TZ") or "Europe/Amsterdam")
 
 
 class LogFilter(logging.Filter):
@@ -65,6 +69,32 @@ coloredlogs.install(
 for pycord_handler in pycord_logger.handlers:
     pycord_handler.addFilter(LogFilter())
 
+events = []
+CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3/calendars"
+CALENDAR_HOLIDAY = r"nl.dutch%23holiday@group.v.calendar.google.com"
+try:
+    res = requests.get(
+        f"{CALENDAR_BASE_URL}/{CALENDAR_HOLIDAY}/events?key={os.getenv('GOOGLE_API_KEY')}",
+        timeout=10,
+    )
+    res.raise_for_status()
+    events = res.json()["items"]
+except requests.exceptions.RequestException as error:
+    logger.error("Failed to fetch holidays: %s", error)
+holidays = []
+for event in events:
+    start_date = datetime.strptime(event["start"]["date"], r"%Y-%m-%d").date()
+    if start_date >= datetime.now().date():
+        holidays.append(
+            {
+                "url": event["htmlLink"],
+                "summary": event["summary"],
+                "description": event["description"].split("\n")[0],
+                "start": event["start"]["date"],
+            }
+        )
+logger.info("Found %s upcoming holidays", len(holidays))
+
 
 async def connect_nodes():
     """Connect to our Lavalink nodes."""
@@ -80,14 +110,13 @@ async def connect_nodes():
 
 @tasks.loop(hours=1)
 async def send_news_rss():
-    current_time = datetime.now(ZoneInfo("Europe/Amsterdam"))
-    past_hour = current_time - timedelta(hours=1)
+    past_hour = datetime.now(TZ) - timedelta(hours=1)
 
     overheid_data = feedparser.parse("https://feeds.rijksoverheid.nl/nieuws.rss")
     data = overheid_data["entries"]
     news_items_as_embeds = []
     for entry in data:
-        published = datetime(*entry["published_parsed"][:6]).replace(tzinfo=UTC)
+        published = datetime(*entry["published_parsed"][:6], tzinfo=UTC)
         if published >= past_hour:
             title = entry["title"]
             description = entry["summary"]
@@ -116,6 +145,25 @@ async def send_news_rss():
             await sleep(0.1)
 
 
+@tasks.loop(time=time(hour=12, minute=00, tzinfo=TZ))
+async def send_holiday():
+    today = datetime.now().date()
+    for holiday in holidays.copy():
+        holidate = datetime.strptime(holiday["start"], r"%Y-%m-%d").date()
+        if holidate > today:
+            break
+        if holidate == today:
+            embed = discord.Embed(
+                title=holiday["summary"],
+                description=holiday["description"],
+                url=holiday["url"],
+            )
+            for guild in bert.guilds:
+                if guild.system_channel:
+                    await guild.system_channel.send(embed=embed)
+            holidays.remove(holiday)
+
+
 @bert.event
 async def on_ready():
     logger.info("%s is ready to hurt your brain", bert.user.name)
@@ -130,6 +178,10 @@ async def on_ready():
     if not send_news_rss.is_running():
         logger.info("Starting RSS feed task")
         send_news_rss.start()
+
+    if not send_holiday.is_running():
+        logger.info("Starting holiday task")
+        send_holiday.start()
 
 
 @bert.event
@@ -259,6 +311,9 @@ async def todo(interaction: discord.Interaction):
 
 
 @bert.slash_command()
+@option("user", description="The user to send messages to")
+@option("message", description="The message to send")
+@option("amount", description="The amount of messages to send")
 async def rapidlysendmessages(
     interaction: discord.Interaction, user: discord.Member, message: str, amount: int
 ):
@@ -312,6 +367,8 @@ randomSlash = bert.create_group("random", "random thingies")
 
 
 @randomSlash.command(name="number")
+@option("minimum", description="the least it can generate (default: 0)")
+@option("maximum", description="the most it can generate (default: 10)")
 async def _number(
     interaction: discord.Interaction, minimum: int = 0, maximum: int = 10
 ):
@@ -323,6 +380,7 @@ async def _number(
 
 
 @randomSlash.command(name="string")
+@option("length", description="how long the text should be (default: 10)")
 async def _string(interaction: discord.Interaction, length: int = 10):
     """random string"""
     if length > 2000:
@@ -358,6 +416,7 @@ base64Slash = bert.create_group("base64", "base64 cryptology")
 
 
 @base64Slash.command(name="encode")
+@option("text", description="the text")
 async def base64_encode(interaction: discord.Interaction, text: str):
     """encode text to base64"""
     encoded = base64.b64encode(text.encode()).decode("utf-8")
@@ -370,6 +429,7 @@ async def base64_encode(interaction: discord.Interaction, text: str):
 
 
 @base64Slash.command(name="decode")
+@option("text", description="the text")
 async def base64_decode(interaction: discord.Interaction, text: str):
     """decode base64 to text"""
     try:
@@ -384,6 +444,7 @@ hexSlash = bert.create_group("hex", "hexadecimal cryptology")
 
 
 @hexSlash.command(name="encode")
+@option("text", description="the text")
 async def hex_encode(interaction: discord.Interaction, text: str):
     """encode text to hexadecimal"""
     encoded = text.encode("utf-8").hex()
@@ -396,6 +457,7 @@ async def hex_encode(interaction: discord.Interaction, text: str):
 
 
 @hexSlash.command(name="decode")
+@option("text", description="the text")
 async def hex_decode(interaction: discord.Interaction, text: str):
     """decode hexadecimal to text"""
     try:
@@ -412,6 +474,7 @@ caesarSlash = bert.create_group("caesar", "caesar cryptology")
 
 
 def caesar(text: str, shift: int):
+    """Caesar cipher implementation"""
     return "".join(
         (
             chr((ord(char) - 65 + shift) % 26 + 65)
@@ -423,12 +486,16 @@ def caesar(text: str, shift: int):
 
 
 @caesarSlash.command(name="encode")
+@option("text", description="the text")
+@option("shift", description="displacement amount")
 async def caesar_encode(interaction: discord.Interaction, text: str, shift: int):
     """encode text to caesar"""
     await interaction.response.send_message(caesar(text, shift))
 
 
 @caesarSlash.command(name="decode")
+@option("text", description="the text")
+@option("shift", description="displacement amount")
 async def caesar_decode(interaction: discord.Interaction, text: str, shift: int):
     """decode caesar to text"""
     await interaction.response.send_message(caesar(text, -shift))
@@ -438,6 +505,7 @@ binarySlash = bert.create_group("binary", "binary cryptology")
 
 
 @binarySlash.command(name="encode")
+@option("text", description="the text")
 async def binary_encode(interaction: discord.Interaction, text: str):
     """encode text to binary"""
     encoded = " ".join(format(ord(char), "08b") for char in text)
@@ -450,6 +518,7 @@ async def binary_encode(interaction: discord.Interaction, text: str):
 
 
 @binarySlash.command(name="decode")
+@option("text", description="the text")
 async def binary_decode(interaction: discord.Interaction, text: str):
     """decode binary to text"""
     try:
@@ -464,6 +533,7 @@ decimalSlash = bert.create_group("decimal", "decimal cryptology")
 
 
 @decimalSlash.command(name="encode")
+@option("text", description="the text")
 async def decimal_encode(interaction: discord.Interaction, text: str):
     """encode text to decimal"""
     encoded = " ".join(str(ord(char)) for char in text)
@@ -476,6 +546,7 @@ async def decimal_encode(interaction: discord.Interaction, text: str):
 
 
 @decimalSlash.command(name="decode")
+@option("text", description="the text")
 async def decimal_decode(interaction: discord.Interaction, text: str):
     """decode decimal to text"""
     try:
@@ -489,6 +560,7 @@ async def decimal_decode(interaction: discord.Interaction, text: str):
 
 
 async def get_videos(ctx: discord.AutocompleteContext):
+    """search for videos"""
     if not ctx.value:
         return []
     try:
@@ -502,9 +574,11 @@ async def get_videos(ctx: discord.AutocompleteContext):
 
 
 @bert.slash_command()
+@option("query", description="what to search for", autocomplete=get_videos)
+@option("channel", description="the voice channel to join (default: yours)")
 async def play(
-    interaction: discord.Interaction,
-    query: discord.Option(str, autocomplete=get_videos),
+    interaction: discord.ApplicationContext,
+    query: str,
     channel: discord.VoiceChannel = None,
 ):
     """Play a song or playlist"""

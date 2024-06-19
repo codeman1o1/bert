@@ -1,5 +1,4 @@
 ---
-version: "2.4"
 services:
   bert:
     container_name: bert
@@ -38,6 +37,8 @@ services:
       - _JAVA_OPTIONS=-Xmx3G
       - SERVER_PORT=2333
       - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD}
+    volumes:
+      - ./lavalink.yml:/opt/Lavalink/application.yml
     restart: unless-stopped
 
   db:

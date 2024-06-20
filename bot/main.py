@@ -594,7 +594,7 @@ async def play(
 
     tracks = await wavelink.Playable.search(query)
     if not tracks:
-        await interaction.response.send_message("No tracks found")
+        await interaction.response.send_message("No tracks found", ephemeral=True)
         return
 
     player: wavelink.Player = interaction.guild.voice_client

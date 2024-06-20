@@ -15,12 +15,10 @@ import discord
 import feedparser
 import requests
 import wavelink
-from db import DB
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from ui.musik import AddBack, RestoreQueue
-from ui.todolist import Todolist
 
 load_dotenv()
 
@@ -171,10 +169,6 @@ async def on_ready():
     logger.info("Connecting to Lavalink nodes")
     await connect_nodes()
 
-    logger.info("Adding persistent views")
-    for view in (Todolist(),):
-        bert.add_view(view)
-
     if not send_news_rss.is_running():
         logger.info("Starting RSS feed task")
         send_news_rss.start()
@@ -291,23 +285,6 @@ async def on_wavelink_node_ready(payload: wavelink.NodeReadyEventPayload):
 async def _bert(interaction: discord.Interaction):
     """bert"""
     await interaction.response.send_message(interaction.user.mention)
-
-
-@bert.slash_command()
-async def todo(interaction: discord.Interaction):
-    """done"""
-    result = DB.execute(
-        "SELECT * FROM todos WHERE guild = %s", (interaction.guild.id,)
-    ).fetchall()
-
-    if result is None:
-        await interaction.response.send_message("No todo items")
-        return
-
-    embed = discord.Embed(title="Todo List")
-    for row in result:
-        embed.add_field(name=row[1], value=row[2])
-    await interaction.response.send_message(embed=embed, view=Todolist())
 
 
 @bert.slash_command()

@@ -65,7 +65,7 @@ services:
     container_name: bert-ai
     image: ollama/ollama
     volumes:
-      - bertai:/root/.ollama
+      - ai:/root/.ollama
     deploy:
       resources:
         reservations:
@@ -77,4 +77,4 @@ services:
 
 volumes:
   bertdb:
-  bertai:
+  ai:

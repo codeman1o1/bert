@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import binascii
 import contextlib
@@ -8,6 +9,7 @@ import string
 from asyncio import sleep
 from datetime import UTC, datetime, time, timedelta
 from random import choice, randint
+import sys
 from zoneinfo import ZoneInfo
 
 import coloredlogs
@@ -18,7 +20,9 @@ import wavelink
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+from pocketbase import PocketbaseError
 from ui.musik import AddBack, RestoreQueue
+from pb import PB, pb_login
 
 load_dotenv()
 
@@ -251,20 +255,40 @@ async def on_guild_join(guild: discord.Guild):
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
 ):
-    if before.channel and not after.channel:
-        # If the user is the last one to leave the voice channel, disconnect the bot
-        if len(before.channel.members) == 1:
-            if player := member.guild.voice_client:
-                await player.disconnect()
+    if member.voice and member == bert.user and member.voice.mute:
+        # Can't mute bert hehehe
+        await member.edit(mute=False)
         return
 
-    if member.bot:
-        if member != bert.user:
-            return
+    if before.channel and not [
+        member for member in before.channel.members if not member.bot
+    ]:  # No users are in VC
+        if player := member.guild.voice_client:
+            await player.disconnect()
+        with contextlib.suppress(PocketbaseError):
+            row = await PB.collection("vcmaker").get_first(
+                {"filter": f"channelID={before.channel.id} && type='TEMPORARY'"}
+            )
 
-        if after.mute:
-            # Can't mute the bot hehehe
-            await member.edit(mute=False)
+            with contextlib.suppress(
+                discord.errors.HTTPException
+            ):  # This event might have triggered again
+                await before.channel.delete()
+            await PB.collection("vcmaker").delete(row["id"])
+
+    if after.channel:
+        with contextlib.suppress(PocketbaseError):
+            await PB.collection("vcmaker").get_first(
+                {"filter": f"channelID={after.channel.id} && type='PERMANENT'"}
+            )
+            vc = await after.channel.guild.create_voice_channel(
+                f"{member.display_name}'s VC",
+                category=after.channel.category,
+            )
+            await member.move_to(vc)
+            await PB.collection("vcmaker").create(
+                {"channelID": vc.id, "type": "TEMPORARY"}
+            )
 
 
 @bert.event
@@ -536,6 +560,14 @@ async def decimal_decode(interaction: discord.Interaction, text: str):
     await interaction.response.send_message(decoded)
 
 
+@bert.slash_command()
+async def makevcmaker(interaction: discord.Interaction):
+    """Make a voice channel"""
+    vc = await interaction.guild.create_voice_channel("Join to create VC")
+    await PB.collection("vcmaker").create({"channelID": vc.id, "type": "PERMANENT"})
+    await interaction.response.send_message(f"Created {vc.mention}")
+
+
 async def get_videos(ctx: discord.AutocompleteContext):
     """search for videos"""
     try:
@@ -650,4 +682,15 @@ async def stop(interaction: discord.Interaction):
     )
 
 
-bert.run(os.getenv("BOT_TOKEN"))
+async def main():
+    try:
+        await pb_login()
+    except PocketbaseError:
+        logger.critical("Failed to login to Pocketbase")
+        sys.exit(111)  # Exit code 111: Connection refused
+    async with bert:
+        await bert.start(os.getenv("BOT_TOKEN"))
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

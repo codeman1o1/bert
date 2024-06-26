@@ -2,12 +2,12 @@
 services:
   bert:
     container_name: bert
-    build: "./bot"
+    build: bot
     image: codeman1o1/bert
     env_file:
       - .env
     depends_on:
-      db:
+      pocketbase:
         condition: service_healthy
       lavalink:
         condition: service_healthy
@@ -15,12 +15,36 @@ services:
 
   website:
     container_name: bert-website
-    build: "./website"
+    build: website
     image: codeman1o1/bertsite
     ports:
       - "6969:3000"
     env_file:
       - .env
+    restart: unless-stopped
+
+  pocketbase:
+    container_name: bert-pocketbase
+    build:
+      context: pocketbase
+      args:
+        - VERSION=0.22.10
+        - PB_EMAIL=${PB_EMAIL}
+        - PB_PASSWORD=${PB_PASSWORD}
+    image: codeman1o1/bert-pocketbase
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8090/api/health || exit 1
+      interval: 2s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - .env
+    ports:
+      - 8090:8090
+    volumes:
+      - pocketbase:/pb_data
+      - ./pocketbase/pb_data/types.d.ts:/pb_data/types.d.ts
+      - ./pocketbase/migrations:/pb_migrations
     restart: unless-stopped
 
   lavalink:
@@ -29,7 +53,7 @@ services:
     healthcheck:
       test: "netstat -ltn | grep -c ':2333'"
       interval: 2s
-      timeout: 10s
+      timeout: 5s
       retries: 5
     env_file:
       - .env
@@ -41,24 +65,5 @@ services:
       - ./lavalink.yml:/opt/Lavalink/application.yml
     restart: unless-stopped
 
-  db:
-    container_name: bert-db
-    image: postgres:16-alpine
-    healthcheck:
-      test: "pg_isready -U bert -d bert"
-      interval: 2s
-      timeout: 10s
-      retries: 5
-    volumes:
-      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
-      - bertdb:/var/lib/postgresql/data
-    env_file:
-      - .env
-    environment:
-      - POSTGRES_USER=bert
-      - POSTGRES_DB=bert
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-    restart: unless-stopped
-
 volumes:
-  bertdb:
+  pocketbase:

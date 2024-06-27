@@ -561,6 +561,7 @@ async def decimal_decode(interaction: discord.Interaction, text: str):
 
 
 @bert.slash_command()
+@option("category", description="the category to put the VC in")
 async def makevcmaker(
     interaction: discord.Interaction, category: discord.CategoryChannel = None
 ):

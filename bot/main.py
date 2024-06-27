@@ -561,9 +561,13 @@ async def decimal_decode(interaction: discord.Interaction, text: str):
 
 
 @bert.slash_command()
-async def makevcmaker(interaction: discord.Interaction, category: discord.CategoryChannel):
+async def makevcmaker(
+    interaction: discord.Interaction, category: discord.CategoryChannel = None
+):
     """Make a voice channel"""
-    vc = await interaction.guild.create_voice_channel("Join to create VC")
+    vc = await interaction.guild.create_voice_channel(
+        "Join to create VC", category=category
+    )
     await PB.collection("vcmaker").create({"channelID": vc.id, "type": "PERMANENT"})
     await interaction.response.send_message(f"Created {vc.mention}")
 

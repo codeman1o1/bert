@@ -34,7 +34,8 @@ jobs:
         uses: super-linter/super-linter/slim@v5.7.2
         env:
           DEFAULT_BRANCH: main
-          LINTER_RULES_PATH: /
+          LINTER_RULES_PATH: pocketbase\/(migrations|pb_data)
+          FILTER_REGEX_EXCLUDE:
           TYPESCRIPT_DEFAULT_STYLE: prettier
           TYPESCRIPT_ES_CONFIG_FILE: website/.eslintrc.cjs
           # To report GitHub Actions status checks

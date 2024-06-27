@@ -30,11 +30,13 @@ jobs:
           npm ci
           mv node_modules ../node_modules
 
+      - name: Remove generated files
+        run: rm -rf pocketbase/migrations pocketbase/pb_data
+
       - name: Super-linter
         uses: super-linter/super-linter/slim@v5.7.2
         env:
           DEFAULT_BRANCH: main
-          LINTER_RULES_PATH: pocketbase\/(migrations|pb_data)
           FILTER_REGEX_EXCLUDE:
           TYPESCRIPT_DEFAULT_STYLE: prettier
           TYPESCRIPT_ES_CONFIG_FILE: website/.eslintrc.cjs

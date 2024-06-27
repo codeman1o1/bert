@@ -1,33 +1,33 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate((db) => {
   const collection = new Collection({
-    "id": "xbis2vr63respq6",
-    "created": "2024-06-26 08:50:05.456Z",
-    "updated": "2024-06-26 08:50:05.456Z",
+    "id": "yq5t5fajqdx343u",
+    "created": "2024-06-27 17:25:18.387Z",
+    "updated": "2024-06-27 17:25:18.387Z",
     "name": "vcmaker",
     "type": "base",
     "system": false,
     "schema": [
       {
         "system": false,
-        "id": "w1u5vyhq",
-        "name": "channelID",
-        "type": "number",
-        "required": true,
+        "id": "x2mf2oql",
+        "name": "channel",
+        "type": "text",
+        "required": false,
         "presentable": false,
         "unique": false,
         "options": {
           "min": null,
           "max": null,
-          "noDecimal": true
+          "pattern": ""
         }
       },
       {
         "system": false,
-        "id": "5uqjrk6w",
+        "id": "ilmgpujv",
         "name": "type",
         "type": "select",
-        "required": true,
+        "required": false,
         "presentable": false,
         "unique": false,
         "options": {
@@ -37,10 +37,24 @@ migrate((db) => {
             "PERMANENT"
           ]
         }
+      },
+      {
+        "system": false,
+        "id": "adyawrvt",
+        "name": "owner",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": null,
+          "pattern": ""
+        }
       }
     ],
     "indexes": [
-      "CREATE UNIQUE INDEX `idx_FsEfgLF` ON `vcmaker` (`channelID`)"
+      "CREATE UNIQUE INDEX `idx_okMYUxg` ON `vcmaker` (`channel`)"
     ],
     "listRule": null,
     "viewRule": null,
@@ -53,7 +67,7 @@ migrate((db) => {
   return Dao(db).saveCollection(collection);
 }, (db) => {
   const dao = new Dao(db);
-  const collection = dao.findCollectionByNameOrId("xbis2vr63respq6");
+  const collection = dao.findCollectionByNameOrId("yq5t5fajqdx343u");
 
   return dao.deleteCollection(collection);
 })

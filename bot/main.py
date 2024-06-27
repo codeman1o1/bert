@@ -251,6 +251,17 @@ async def on_guild_join(guild: discord.Guild):
     await guild.system_channel.send("bonjour me bert")
 
 
+def get_most_playing_game(vc: discord.VoiceChannel):
+    """returns the game that is played the most in a voice channel"""
+    games = [
+        activity.name
+        for member in vc.members
+        for activity in member.activities
+        if activity.type == discord.ActivityType.playing
+    ]
+    return max(set(games), key=games.count) if games else None
+
+
 @bert.event
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
@@ -260,35 +271,77 @@ async def on_voice_state_update(
         await member.edit(mute=False)
         return
 
-    if before.channel and not [
-        member for member in before.channel.members if not member.bot
-    ]:  # No users are in VC
-        if player := member.guild.voice_client:
-            await player.disconnect()
-        with contextlib.suppress(PocketbaseError):
-            row = await PB.collection("vcmaker").get_first(
-                {"filter": f"channelID={before.channel.id} && type='TEMPORARY'"}
-            )
+    if before.channel != after.channel:  # User moved channels
+        if before.channel and not [
+            member for member in before.channel.members if not member.bot
+        ]:  # No users are in the previous VC
+            if player := member.guild.voice_client:
+                await player.disconnect()
+            with contextlib.suppress(PocketbaseError):
+                row = await PB.collection("vcmaker").get_first(
+                    {
+                        "filter": f"channel='{str(before.channel.id)}' && type='TEMPORARY'"
+                    }
+                )
 
-            with contextlib.suppress(
-                discord.errors.HTTPException
-            ):  # This event might have triggered again
-                await before.channel.delete()
-            await PB.collection("vcmaker").delete(row["id"])
+                with contextlib.suppress(
+                    discord.errors.HTTPException
+                ):  # This event might have triggered again
+                    await before.channel.delete()
+                await PB.collection("vcmaker").delete(row["id"])
 
-    if after.channel:
-        with contextlib.suppress(PocketbaseError):
-            await PB.collection("vcmaker").get_first(
-                {"filter": f"channelID={after.channel.id} && type='PERMANENT'"}
+        if after.channel:
+            with contextlib.suppress(PocketbaseError):
+                result = await PB.collection("vcmaker").get_first(
+                    {"filter": f"channel='{str(after.channel.id)}'"}
+                )
+                if result["type"] == "PERMANENT":
+                    vc = await after.channel.guild.create_voice_channel(
+                        f"{member.display_name}'s VC",
+                        category=after.channel.category,
+                    )
+                    await member.move_to(vc)
+                    await PB.collection("vcmaker").create(
+                        {
+                            "channel": str(vc.id),
+                            "type": "TEMPORARY",
+                            "owner": str(member.id),
+                        }
+                    )
+                elif result["type"] == "TEMPORARY":
+                    if not get_most_playing_game(
+                        after.channel
+                    ):  # No one is playing a game
+                        owner = await bert.get_or_fetch_user(int(result["owner"]))
+                        vc_name = f"{owner.display_name}'s VC"
+                        if after.channel.name != vc_name:
+                            await after.channel.edit(name=vc_name)
+
+
+@bert.event
+async def on_presence_update(before: discord.Member, after: discord.Member):
+    if before.activity == after.activity:
+        return
+
+    if after.voice:
+        game = get_most_playing_game(after.voice.channel)
+        if (
+            game
+            and len(
+                [member for member in after.voice.channel.members if not member.bot]
             )
-            vc = await after.channel.guild.create_voice_channel(
-                f"{member.display_name}'s VC",
-                category=after.channel.category,
+            > 1
+        ):
+            if after.voice.channel.name != game:
+                await after.voice.channel.edit(name=game)
+        else:
+            result = await PB.collection("vcmaker").get_first(
+                {"filter": f"channel='{str(after.voice.channel.id)}'"}
             )
-            await member.move_to(vc)
-            await PB.collection("vcmaker").create(
-                {"channelID": vc.id, "type": "TEMPORARY"}
-            )
+            owner = await bert.get_or_fetch_user(int(result["owner"]))
+            vc_name = f"{owner.display_name}'s VC"
+            if after.voice.channel.name != vc_name:
+                await after.voice.channel.edit(name=vc_name)
 
 
 @bert.event
@@ -569,7 +622,7 @@ async def makevcmaker(
     vc = await interaction.guild.create_voice_channel(
         "Join to create VC", category=category
     )
-    await PB.collection("vcmaker").create({"channelID": vc.id, "type": "PERMANENT"})
+    await PB.collection("vcmaker").create({"channel": str(vc.id), "type": "PERMANENT"})
     await interaction.response.send_message(f"Created {vc.mention}")
 
 

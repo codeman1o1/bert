@@ -1,6 +1,6 @@
 # Until Pocketbase hits stable, there will be no official Docker image.
 
-FROM alpine:latest
+FROM alpine:3
 
 ARG TARGETOS
 ARG TARGETARCH

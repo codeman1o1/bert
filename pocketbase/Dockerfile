@@ -12,6 +12,7 @@ ARG PB_PASSWORD
 ENV BUILDX_ARCH="${TARGETOS:-linux}_${TARGETARCH:-amd64}${TARGETVARIANT}"
 
 ADD https://github.com/pocketbase/pocketbase/releases/download/v${VERSION}/pocketbase_${VERSION}_${BUILDX_ARCH}.zip /tmp/pb.zip
+# hadolint ignore=DL3018
 RUN apk --no-cache add unzip ca-certificates \
     && unzip /tmp/pb.zip \
     && mv pocketbase /usr/local/bin \

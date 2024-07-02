@@ -1,6 +1,6 @@
 requests==2.32.2
 py-cord[voice]==2.5.0
-wavelink==3.3.0
+wavelink==3.4.0
 python-dotenv==1.0.0
 psycopg[binary]==3.1.13
 coloredlogs==15.0.1

@@ -166,6 +166,16 @@ async def send_holiday():
             holidays.remove(holiday)
 
 
+async def clean_db():
+    channels = await PB.collection("vcmaker").get_full_list()
+    deleted = 0
+    for channel in channels:
+        if not bert.get_channel(int(channel["channel"])):
+            await PB.collection("vcmaker").delete(channel["id"])
+            deleted += 1
+    logger.debug("Deleted %s channels", deleted)
+
+
 @bert.event
 async def on_ready():
     logger.info("%s is ready to hurt your brain", bert.user.name)
@@ -180,6 +190,8 @@ async def on_ready():
     if not send_holiday.is_running():
         logger.info("Starting holiday task")
         send_holiday.start()
+
+    await clean_db()
 
 
 @bert.event

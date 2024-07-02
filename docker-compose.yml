@@ -51,7 +51,8 @@ services:
     container_name: bert-lavalink
     image: ghcr.io/lavalink-devs/lavalink:4-alpine
     healthcheck:
-      test: "netstat -ltn | grep -c ':2333'"
+      test: nc -z localhost 2333
+      start_period: 3s
       interval: 1s
       timeout: 2s
       retries: 5

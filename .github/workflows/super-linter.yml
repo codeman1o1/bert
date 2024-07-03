@@ -24,6 +24,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Python dependencies
+        run: pip install -r bot/requirements.txt
+
       - name: Install Node dependencies
         run: |
           cd website

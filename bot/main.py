@@ -173,7 +173,7 @@ async def clean_db():
         if not bert.get_channel(int(channel["channel"])):
             await PB.collection("vcmaker").delete(channel["id"])
             deleted += 1
-    logger.debug("Deleted %s channels", deleted)
+    logger.info("Cleaned database (%s rows affected)", deleted)
 
 
 @bert.event

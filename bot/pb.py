@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from pocketbase import PocketBase
+from pocketbase import PocketBase  # type: ignore
 
 load_dotenv()
 

@@ -274,6 +274,32 @@ def get_most_playing_game(vc: discord.VoiceChannel):
     return max(set(games), key=games.count) if games else None
 
 
+async def determine_temp_vc_name(vc: discord.VoiceChannel) -> str:
+    game = get_most_playing_game(vc)
+    if game and len([member for member in vc.members if not member.bot]) > 1:
+        return game
+    result = await PB.collection("vcmaker").get_first(
+        {"filter": f"channel='{str(vc.id)}'"}
+    )
+    owner = await bert.get_or_fetch_user(int(result["owner"]))
+    return f"{owner.display_name}'s VC"
+
+
+async def edit_vc_name(vc: discord.VoiceChannel, name: str) -> bool:
+    """
+    Edit the name of a voice channel if it's different from the desired name
+
+    This is necessary because Discord has a ratelimit
+    on editing channel names of 2 requests per 10 minutes
+
+    Returns True if the name was changed, False if it wasn't
+    """
+    if vc.name != name:
+        await vc.edit(name=name)
+        return True
+    return False
+
+
 @bert.event
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
@@ -284,23 +310,34 @@ async def on_voice_state_update(
         return
 
     if before.channel != after.channel:  # User moved channels
-        if before.channel and not [
-            member for member in before.channel.members if not member.bot
-        ]:  # No users are in the previous VC
-            if player := member.guild.voice_client:
-                await player.disconnect()
-            with contextlib.suppress(PocketbaseError):
-                row = await PB.collection("vcmaker").get_first(
-                    {
-                        "filter": f"channel='{str(before.channel.id)}' && type='TEMPORARY'"
-                    }
-                )
+        if before.channel:
+            if not [
+                member for member in before.channel.members if not member.bot
+            ]:  # No users are in the previous VC
+                if player := member.guild.voice_client:
+                    await player.disconnect()
 
-                with contextlib.suppress(
-                    discord.errors.HTTPException
-                ):  # This event might have triggered again
-                    await before.channel.delete()
-                await PB.collection("vcmaker").delete(row["id"])
+                with contextlib.suppress(PocketbaseError):
+                    row = await PB.collection("vcmaker").get_first(
+                        {
+                            "filter": f"channel='{str(before.channel.id)}' && type='TEMPORARY'"
+                        }
+                    )
+
+                    with contextlib.suppress(
+                        discord.errors.HTTPException
+                    ):  # This event might have triggered again
+                        await before.channel.delete()
+                    await PB.collection("vcmaker").delete(row["id"])
+            else:
+                with contextlib.suppress(PocketbaseError):
+                    await PB.collection("vcmaker").get_first(
+                        {
+                            "filter": f"channel='{str(before.channel.id)}' && type='TEMPORARY'"
+                        }
+                    )
+                    vc_name = await determine_temp_vc_name(before.channel)
+                    await edit_vc_name(before.channel, vc_name)
 
         if after.channel:
             with contextlib.suppress(PocketbaseError):
@@ -321,13 +358,8 @@ async def on_voice_state_update(
                         }
                     )
                 elif result["type"] == "TEMPORARY":
-                    if not get_most_playing_game(
-                        after.channel
-                    ):  # No one is playing a game
-                        owner = await bert.get_or_fetch_user(int(result["owner"]))
-                        vc_name = f"{owner.display_name}'s VC"
-                        if after.channel.name != vc_name:
-                            await after.channel.edit(name=vc_name)
+                    vc_name = await determine_temp_vc_name(after.channel)
+                    await edit_vc_name(after.channel, vc_name)
 
 
 @bert.event
@@ -336,24 +368,8 @@ async def on_presence_update(before: discord.Member, after: discord.Member):
         return
 
     if after.voice:
-        game = get_most_playing_game(after.voice.channel)
-        if (
-            game
-            and len(
-                [member for member in after.voice.channel.members if not member.bot]
-            )
-            > 1
-        ):
-            if after.voice.channel.name != game:
-                await after.voice.channel.edit(name=game)
-        else:
-            result = await PB.collection("vcmaker").get_first(
-                {"filter": f"channel='{str(after.voice.channel.id)}'"}
-            )
-            owner = await bert.get_or_fetch_user(int(result["owner"]))
-            vc_name = f"{owner.display_name}'s VC"
-            if after.voice.channel.name != vc_name:
-                await after.voice.channel.edit(name=vc_name)
+        vc_name = await determine_temp_vc_name(after.voice.channel)
+        await edit_vc_name(after.voice.channel, vc_name)
 
 
 @bert.event

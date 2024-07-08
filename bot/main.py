@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import binascii
 import contextlib
@@ -5,6 +6,7 @@ import logging
 import os
 import re
 import string
+import sys
 from asyncio import sleep
 from datetime import UTC, datetime, time, timedelta
 from random import choice, randint
@@ -18,6 +20,8 @@ import wavelink
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+from pb import PB, pb_login
+from pocketbase import PocketbaseError  # type: ignore
 from ui.musik import AddBack, RestoreQueue
 
 load_dotenv()
@@ -162,6 +166,16 @@ async def send_holiday():
             holidays.remove(holiday)
 
 
+async def clean_db():
+    channels = await PB.collection("vcmaker").get_full_list()
+    deleted = 0
+    for channel in channels:
+        if not bert.get_channel(int(channel["channel"])):
+            await PB.collection("vcmaker").delete(channel["id"])
+            deleted += 1
+    logger.info("Cleaned database (%s rows affected)", deleted)
+
+
 @bert.event
 async def on_ready():
     logger.info("%s is ready to hurt your brain", bert.user.name)
@@ -176,6 +190,8 @@ async def on_ready():
     if not send_holiday.is_running():
         logger.info("Starting holiday task")
         send_holiday.start()
+
+    await clean_db()
 
 
 @bert.event
@@ -247,24 +263,113 @@ async def on_guild_join(guild: discord.Guild):
     await guild.system_channel.send("bonjour me bert")
 
 
+def get_most_playing_game(vc: discord.VoiceChannel):
+    """returns the game that is played the most in a voice channel"""
+    games = [
+        activity.name
+        for member in vc.members
+        for activity in member.activities
+        if activity.type == discord.ActivityType.playing
+    ]
+    return max(set(games), key=games.count) if games else None
+
+
+async def determine_temp_vc_name(vc: discord.VoiceChannel) -> str:
+    game = get_most_playing_game(vc)
+    if game and len([member for member in vc.members if not member.bot]) > 1:
+        return game
+    result = await PB.collection("vcmaker").get_first(
+        {"filter": f"channel='{str(vc.id)}'"}
+    )
+    owner = await bert.get_or_fetch_user(int(result["owner"]))
+    return f"{owner.display_name}'s VC"
+
+
+async def edit_vc_name(vc: discord.VoiceChannel, name: str) -> bool:
+    """
+    Edit the name of a voice channel if it's different from the desired name
+
+    This is necessary because Discord has a ratelimit
+    on editing channel names of 2 requests per 10 minutes
+
+    Returns True if the name was changed, False if it wasn't
+    """
+    if vc.name != name:
+        await vc.edit(name=name)
+        return True
+    return False
+
+
 @bert.event
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
 ):
-    if before.channel and not after.channel:
-        # If the user is the last one to leave the voice channel, disconnect the bot
-        if len(before.channel.members) == 1:
-            if player := member.guild.voice_client:
-                await player.disconnect()
+    if member.voice and member == bert.user and member.voice.mute:
+        # Can't mute bert hehehe
+        await member.edit(mute=False)
         return
 
-    if member.bot:
-        if member != bert.user:
-            return
+    if before.channel != after.channel:  # User moved channels
+        if before.channel:
+            if not [
+                member for member in before.channel.members if not member.bot
+            ]:  # No users are in the previous VC
+                if player := member.guild.voice_client:
+                    await player.disconnect()
 
-        if after.mute:
-            # Can't mute the bot hehehe
-            await member.edit(mute=False)
+                with contextlib.suppress(PocketbaseError):
+                    row = await PB.collection("vcmaker").get_first(
+                        {
+                            "filter": f"channel='{str(before.channel.id)}' && type='TEMPORARY'"
+                        }
+                    )
+
+                    with contextlib.suppress(
+                        discord.errors.HTTPException
+                    ):  # This event might have triggered again
+                        await before.channel.delete()
+                    await PB.collection("vcmaker").delete(row["id"])
+            else:
+                with contextlib.suppress(PocketbaseError):
+                    await PB.collection("vcmaker").get_first(
+                        {
+                            "filter": f"channel='{str(before.channel.id)}' && type='TEMPORARY'"
+                        }
+                    )
+                    vc_name = await determine_temp_vc_name(before.channel)
+                    await edit_vc_name(before.channel, vc_name)
+
+        if after.channel:
+            with contextlib.suppress(PocketbaseError):
+                result = await PB.collection("vcmaker").get_first(
+                    {"filter": f"channel='{str(after.channel.id)}'"}
+                )
+                if result["type"] == "PERMANENT":
+                    vc = await after.channel.guild.create_voice_channel(
+                        f"{member.display_name}'s VC",
+                        category=after.channel.category,
+                    )
+                    await member.move_to(vc)
+                    await PB.collection("vcmaker").create(
+                        {
+                            "channel": str(vc.id),
+                            "type": "TEMPORARY",
+                            "owner": str(member.id),
+                        }
+                    )
+                elif result["type"] == "TEMPORARY":
+                    vc_name = await determine_temp_vc_name(after.channel)
+                    await edit_vc_name(after.channel, vc_name)
+
+
+@bert.event
+async def on_presence_update(before: discord.Member, after: discord.Member):
+    if before.activity == after.activity:
+        return
+
+    if after.voice:
+        vc_name = await determine_temp_vc_name(after.voice.channel)
+        await edit_vc_name(after.voice.channel, vc_name)
 
 
 @bert.event
@@ -536,6 +641,19 @@ async def decimal_decode(interaction: discord.Interaction, text: str):
     await interaction.response.send_message(decoded)
 
 
+@bert.slash_command()
+@option("category", description="the category to put the VC in")
+async def makevcmaker(
+    interaction: discord.Interaction, category: discord.CategoryChannel = None
+):
+    """Make a voice channel"""
+    vc = await interaction.guild.create_voice_channel(
+        "Join to create VC", category=category
+    )
+    await PB.collection("vcmaker").create({"channel": str(vc.id), "type": "PERMANENT"})
+    await interaction.response.send_message(f"Created {vc.mention}")
+
+
 async def get_videos(ctx: discord.AutocompleteContext):
     """search for videos"""
     try:
@@ -650,4 +768,15 @@ async def stop(interaction: discord.Interaction):
     )
 
 
-bert.run(os.getenv("BOT_TOKEN"))
+async def main():
+    try:
+        await pb_login()
+    except PocketbaseError:
+        logger.critical("Failed to login to Pocketbase")
+        sys.exit(111)  # Exit code 111: Connection refused
+    async with bert:
+        await bert.start(os.getenv("BOT_TOKEN"))
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

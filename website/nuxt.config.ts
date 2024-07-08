@@ -2,6 +2,11 @@
 export default defineNuxtConfig({
 	modules: ["@nuxtjs/tailwindcss"],
 	devtools: { enabled: true },
+	routeRules: {
+		"/github": {
+			redirect: "https://github.com/codeman1o1/bert"
+		}
+	},
 	devServer: {
 		port: 6969
 	}

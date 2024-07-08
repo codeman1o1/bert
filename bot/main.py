@@ -21,9 +21,9 @@ import wavelink
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+from ollama import AsyncClient
 from pb import PB, pb_login
 from pocketbase import PocketbaseError  # type: ignore
-from ollama import AsyncClient
 from ui.musik import AddBack, RestoreQueue
 
 load_dotenv()

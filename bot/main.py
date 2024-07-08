@@ -103,7 +103,19 @@ logger.info("Found %s upcoming holidays", len(holidays))
 
 
 async def download_ai_models(models: List[str]):
+    """Download the AI models from the Ollama server."""
+    downloaded_models = await ollama.list()
+    for model in models.copy():
+        if any(
+            m["name"].replace(":latest", "") == model
+            for m in downloaded_models["models"]
+        ):
+            models.remove(model)
+    if not models:
+        return
+    logger.debug("Downloading %s AI models (%s)", len(models), ", ".join(models))
     for model in models:
+        logger.debug("Downloading %s...", model)
         await ollama.pull(model=model)
 
 
@@ -807,13 +819,13 @@ async def stop(interaction: discord.Interaction):
     )
 
 
-# asyncio.run(download_ai_models(["llama2-uncensored", "llava"]))
 async def main():
     try:
         await pb_login()
     except PocketbaseError:
         logger.critical("Failed to login to Pocketbase")
         sys.exit(111)  # Exit code 111: Connection refused
+    await download_ai_models(["llama2-uncensored", "llava"])
     async with bert:
         await bert.start(os.getenv("BOT_TOKEN"))
 

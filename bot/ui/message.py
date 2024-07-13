@@ -1,5 +1,5 @@
 import discord
-from discord.ui import Modal, InputText
+from discord.ui import InputText, Modal
 from pb import PB
 
 

@@ -20,9 +20,10 @@ import wavelink
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+from ui.message import StoreMessage
+from ui.musik import AddBack, RestoreQueue
 from pb import PB, pb_login
 from pocketbase import PocketbaseError  # type: ignore
-from ui.musik import AddBack, RestoreQueue
 
 load_dotenv()
 
@@ -384,6 +385,53 @@ async def on_wavelink_track_end(payload: wavelink.TrackEndEventPayload):
 @bert.event
 async def on_wavelink_node_ready(payload: wavelink.NodeReadyEventPayload):
     logger.info("Lavalink node %s is ready", payload.node.identifier)
+
+
+### User slash commands ###
+
+message_group = bert.create_group(
+    "message",
+    "message storage",
+    integration_types={discord.IntegrationType.user_install},
+)
+
+
+@message_group.command()
+async def store(interaction: discord.Interaction):
+    """Store a message that can be retrieved later"""
+    await interaction.response.send_modal(StoreMessage())
+
+
+@message_group.command()
+@option("key", description="The key of the message to retrieve")
+async def load(interaction: discord.Interaction, key: str):
+    """Retrieve a stored message"""
+    try:
+        row = await PB.collection("messages").get_first({"filter": f"id='{key}'"})
+        await interaction.response.send_message(row["message"], ephemeral=True)
+    except PocketbaseError:
+        await interaction.response.send_message(
+            "No message found with that key", ephemeral=True
+        )
+
+
+@message_group.command()
+@option("key", description="The key of the message to delete")
+async def delete(interaction: discord.Interaction, key: str):
+    """Delete a stored message"""
+    try:
+        await PB.collection("messages").get_first(
+            {"filter": f"id='{key}' && user_id='{str(interaction.user.id)}'"}
+        )
+        await PB.collection("messages").delete(key)
+        await interaction.response.send_message("Message deleted", ephemeral=True)
+    except PocketbaseError:
+        await interaction.response.send_message(
+            "No message found with that key", ephemeral=True
+        )
+
+
+### Global slash commands ###
 
 
 @bert.slash_command(name="bert")

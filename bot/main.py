@@ -20,10 +20,10 @@ import wavelink
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from ui.message import StoreMessage
-from ui.musik import AddBack, RestoreQueue
 from pb import PB, pb_login
 from pocketbase import PocketbaseError  # type: ignore
+from ui.message import StoreMessage
+from ui.musik import AddBack, RestoreQueue
 
 load_dotenv()
 
@@ -387,8 +387,6 @@ async def on_wavelink_node_ready(payload: wavelink.NodeReadyEventPayload):
     logger.info("Lavalink node %s is ready", payload.node.identifier)
 
 
-### User slash commands ###
-
 message_group = bert.create_group(
     "message",
     "message storage",
@@ -429,9 +427,6 @@ async def delete(interaction: discord.Interaction, key: str):
         await interaction.response.send_message(
             "No message found with that key", ephemeral=True
         )
-
-
-### Global slash commands ###
 
 
 @bert.slash_command(name="bert")

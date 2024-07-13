@@ -1,6 +1,6 @@
-from pb import PB
 import discord
 from discord.ui import Modal, InputText
+from pb import PB
 
 
 class StoreMessage(Modal):
@@ -21,4 +21,6 @@ class StoreMessage(Modal):
         row = await PB.collection("messages").create(
             {"message": self.children[0].value, "user_id": str(interaction.user.id)}
         )
-        await interaction.response.send_message(f"Message stored with the key `{row["id"]}`", ephemeral=True)
+        await interaction.response.send_message(
+            f"Message stored with the key `{row['id']}`", ephemeral=True
+        )

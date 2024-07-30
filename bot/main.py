@@ -429,6 +429,50 @@ async def delete(interaction: discord.Interaction, key: str):
         )
 
 
+@bert.slash_command(integration_types={discord.IntegrationType.user_install})
+async def everythingisawesome(interaction: discord.Interaction):
+    """Everything is AWESOME"""
+    await interaction.response.send_message(
+        """[Everything is awesome!
+Everything is cool when you're part of a team!
+Everything is awesome!
+When you're living out a dream!
+Everything thing is better when we stick together!
+Side by side, you and I, gonna win forever!
+Let's party forever!
+We're the same, I'm like you, you're like me.
+We're all working in harmony.
+Everything is awesome!
+Everything is cool when you're part of a team!
+Everything is awesome!
+When you're living out a dream!
+
+Whoo!
+Three, two, one, go. Have you heard the news?
+Everyone's talking!
+Life is good 'cause everything's awesome!
+Lost my job, there's a new opportunity!
+More free time for my awesome community!
+I feel more awesome than an awesome possum!
+Dip my body in chocolate frosting!
+Three years later, wash off the frosting!
+Smellin' like a blossom.
+Everything is awesome!
+Stepped in mud, got brand new shoes!
+It's awesome to win and it's awesome to lose!
+
+Everything is better when we stick together!
+Side by side, you and I, gonna win forever!
+Let's party forever!
+We're the same, I'm like you, you're like me.
+We're all working in harmony-y-y-y-y-y-y-y.
+Everything is awesome!
+Everything is cool when you're part of a team!
+Everything is awesome!
+When you're living out a dream.](https://youtu.be/g55SloahAj0)"""
+    )
+
+
 @bert.slash_command(name="bert")
 async def _bert(interaction: discord.Interaction):
     """bert"""
@@ -735,7 +779,7 @@ async def play(
         await interaction.response.send_message("No tracks found", ephemeral=True)
         return
 
-    player: wavelink.Player = interaction.guild.voice_client
+    player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
         try:
@@ -776,7 +820,7 @@ async def play(
 @bert.slash_command()
 async def skip(interaction: discord.Interaction):
     """Skip the current song"""
-    player: wavelink.Player = interaction.guild.voice_client
+    player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
         await interaction.response.send_message("Not playing anything")
@@ -793,7 +837,7 @@ async def skip(interaction: discord.Interaction):
 @bert.slash_command()
 async def stop(interaction: discord.Interaction):
     """Stop playing"""
-    player: wavelink.Player = interaction.guild.voice_client
+    player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
         await interaction.response.send_message("Not playing anything")

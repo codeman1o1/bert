@@ -8,12 +8,13 @@ on: # yamllint disable-line rule:truthy
 permissions: {}
 
 jobs:
-  bot:
-    name: Lint bot
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
 
     permissions:
       contents: read
+      packages: read
       # To report GitHub Actions status checks
       statuses: write
 
@@ -21,51 +22,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # super-linter needs the full git history to get the
-          # list of files that changed across commits
           fetch-depth: 0
 
-      - name: Install PIP dependencies
-        run: |
-          cd bot
-          pip install -r requirements.txt
-
-      - name: Super-linter
-        uses: super-linter/super-linter/slim@v6.8.0
-        env:
-          DEFAULT_WORKSPACE: bot
-          LINTER_RULES_PATH: bot
-          # To report GitHub Actions status checks
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  website:
-    name: Lint website
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      # To report GitHub Actions status checks
-      statuses: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
         with:
-          # super-linter needs the full git history to get the
-          # list of files that changed across commits
-          fetch-depth: 0
+          python-version: 3.12
+
+      - name: Install Python dependencies
+        run: pip install -r bot/requirements.txt
 
       - name: Install Node dependencies
         run: |
           cd website
-          npm clean-install
+          npm ci
+          mv node_modules ../node_modules
+
+      - name: Remove generated files
+        run: rm -rf pocketbase/migrations pocketbase/pb_data
 
       - name: Super-linter
         uses: super-linter/super-linter/slim@v6.8.0
         env:
-          DEFAULT_WORKSPACE: website
-          LINTER_RULES_PATH: website
+          DEFAULT_BRANCH: main
+          LINTER_RULES_PATH: /
+          VALIDATE_HTML: false # too opinionated and full of bs
           TYPESCRIPT_DEFAULT_STYLE: prettier
-          TYPESCRIPT_ES_CONFIG_FILE: .eslintrc.cjs
+          TYPESCRIPT_ES_CONFIG_FILE: website/.eslintrc.cjs
           # To report GitHub Actions status checks
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

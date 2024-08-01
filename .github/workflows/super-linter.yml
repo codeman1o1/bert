@@ -32,6 +32,14 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r bot/requirements.txt
 
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+
+      - name: Install Python dependencies
+        run: pip install -r bot/requirements.txt
+
       - name: Install Node dependencies
         run: |
           cd website

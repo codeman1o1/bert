@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import binascii
 import contextlib
@@ -5,6 +6,7 @@ import logging
 import os
 import re
 import string
+import sys
 from asyncio import sleep
 from datetime import UTC, datetime, time, timedelta
 from random import choice, randint
@@ -15,12 +17,13 @@ import discord
 import feedparser
 import requests
 import wavelink
-from db import DB
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+from pb import PB, pb_login
+from pocketbase import PocketbaseError  # type: ignore
+from ui.message import StoreMessage
 from ui.musik import AddBack, RestoreQueue
-from ui.todolist import Todolist
 
 load_dotenv()
 
@@ -164,16 +167,22 @@ async def send_holiday():
             holidays.remove(holiday)
 
 
+async def clean_db():
+    channels = await PB.collection("vcmaker").get_full_list()
+    deleted = 0
+    for channel in channels:
+        if not bert.get_channel(int(channel["channel"])):
+            await PB.collection("vcmaker").delete(channel["id"])
+            deleted += 1
+    logger.info("Cleaned database (%s rows affected)", deleted)
+
+
 @bert.event
 async def on_ready():
     logger.info("%s is ready to hurt your brain", bert.user.name)
 
     logger.info("Connecting to Lavalink nodes")
     await connect_nodes()
-
-    logger.info("Adding persistent views")
-    for view in (Todolist(),):
-        bert.add_view(view)
 
     if not send_news_rss.is_running():
         logger.info("Starting RSS feed task")
@@ -182,6 +191,8 @@ async def on_ready():
     if not send_holiday.is_running():
         logger.info("Starting holiday task")
         send_holiday.start()
+
+    await clean_db()
 
 
 @bert.event
@@ -253,24 +264,113 @@ async def on_guild_join(guild: discord.Guild):
     await guild.system_channel.send("bonjour me bert")
 
 
+def get_most_playing_game(vc: discord.VoiceChannel):
+    """returns the game that is played the most in a voice channel"""
+    games = [
+        activity.name
+        for member in vc.members
+        for activity in member.activities
+        if activity.type == discord.ActivityType.playing
+    ]
+    return max(set(games), key=games.count) if games else None
+
+
+async def determine_temp_vc_name(vc: discord.VoiceChannel) -> str:
+    game = get_most_playing_game(vc)
+    if game and len([member for member in vc.members if not member.bot]) > 1:
+        return game
+    result = await PB.collection("vcmaker").get_first(
+        {"filter": f"channel='{str(vc.id)}'"}
+    )
+    owner = await bert.get_or_fetch_user(int(result["owner"]))
+    return f"{owner.display_name}'s VC"
+
+
+async def edit_vc_name(vc: discord.VoiceChannel, name: str) -> bool:
+    """
+    Edit the name of a voice channel if it's different from the desired name
+
+    This is necessary because Discord has a ratelimit
+    on editing channel names of 2 requests per 10 minutes
+
+    Returns True if the name was changed, False if it wasn't
+    """
+    if vc.name != name:
+        await vc.edit(name=name)
+        return True
+    return False
+
+
 @bert.event
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
 ):
-    if before.channel and not after.channel:
-        # If the user is the last one to leave the voice channel, disconnect the bot
-        if len(before.channel.members) == 1:
-            if player := member.guild.voice_client:
-                await player.disconnect()
+    if member.voice and member == bert.user and member.voice.mute:
+        # Can't mute bert hehehe
+        await member.edit(mute=False)
         return
 
-    if member.bot:
-        if member != bert.user:
-            return
+    if before.channel != after.channel:  # User moved channels
+        if before.channel:
+            if not [
+                member for member in before.channel.members if not member.bot
+            ]:  # No users are in the previous VC
+                if player := member.guild.voice_client:
+                    await player.disconnect()
 
-        if after.mute:
-            # Can't mute the bot hehehe
-            await member.edit(mute=False)
+                with contextlib.suppress(PocketbaseError):
+                    row = await PB.collection("vcmaker").get_first(
+                        {
+                            "filter": f"channel='{str(before.channel.id)}' && type='TEMPORARY'"
+                        }
+                    )
+
+                    with contextlib.suppress(
+                        discord.errors.HTTPException
+                    ):  # This event might have triggered again
+                        await before.channel.delete()
+                    await PB.collection("vcmaker").delete(row["id"])
+            else:
+                with contextlib.suppress(PocketbaseError):
+                    await PB.collection("vcmaker").get_first(
+                        {
+                            "filter": f"channel='{str(before.channel.id)}' && type='TEMPORARY'"
+                        }
+                    )
+                    vc_name = await determine_temp_vc_name(before.channel)
+                    await edit_vc_name(before.channel, vc_name)
+
+        if after.channel:
+            with contextlib.suppress(PocketbaseError):
+                result = await PB.collection("vcmaker").get_first(
+                    {"filter": f"channel='{str(after.channel.id)}'"}
+                )
+                if result["type"] == "PERMANENT":
+                    vc = await after.channel.guild.create_voice_channel(
+                        f"{member.display_name}'s VC",
+                        category=after.channel.category,
+                    )
+                    await member.move_to(vc)
+                    await PB.collection("vcmaker").create(
+                        {
+                            "channel": str(vc.id),
+                            "type": "TEMPORARY",
+                            "owner": str(member.id),
+                        }
+                    )
+                elif result["type"] == "TEMPORARY":
+                    vc_name = await determine_temp_vc_name(after.channel)
+                    await edit_vc_name(after.channel, vc_name)
+
+
+@bert.event
+async def on_presence_update(before: discord.Member, after: discord.Member):
+    if before.activity == after.activity:
+        return
+
+    if after.voice:
+        vc_name = await determine_temp_vc_name(after.voice.channel)
+        await edit_vc_name(after.voice.channel, vc_name)
 
 
 @bert.event
@@ -287,27 +387,96 @@ async def on_wavelink_node_ready(payload: wavelink.NodeReadyEventPayload):
     logger.info("Lavalink node %s is ready", payload.node.identifier)
 
 
+message_group = bert.create_group(
+    "message",
+    "message storage",
+    integration_types={discord.IntegrationType.user_install},
+)
+
+
+@message_group.command()
+async def store(interaction: discord.Interaction):
+    """Store a message that can be retrieved later"""
+    await interaction.response.send_modal(StoreMessage())
+
+
+@message_group.command()
+@option("key", description="The key of the message to retrieve")
+async def load(interaction: discord.Interaction, key: str):
+    """Retrieve a stored message"""
+    try:
+        row = await PB.collection("messages").get_first({"filter": f"id='{key}'"})
+        await interaction.response.send_message(row["message"], ephemeral=True)
+    except PocketbaseError:
+        await interaction.response.send_message(
+            "No message found with that key", ephemeral=True
+        )
+
+
+@message_group.command()
+@option("key", description="The key of the message to delete")
+async def delete(interaction: discord.Interaction, key: str):
+    """Delete a stored message"""
+    try:
+        await PB.collection("messages").get_first(
+            {"filter": f"id='{key}' && user_id='{str(interaction.user.id)}'"}
+        )
+        await PB.collection("messages").delete(key)
+        await interaction.response.send_message("Message deleted", ephemeral=True)
+    except PocketbaseError:
+        await interaction.response.send_message(
+            "No message found with that key", ephemeral=True
+        )
+
+
+@bert.slash_command(integration_types={discord.IntegrationType.user_install})
+async def everythingisawesome(interaction: discord.Interaction):
+    """Everything is AWESOME"""
+    await interaction.response.send_message(
+        """[Everything is awesome!
+Everything is cool when you're part of a team!
+Everything is awesome!
+When you're living out a dream!
+Everything thing is better when we stick together!
+Side by side, you and I, gonna win forever!
+Let's party forever!
+We're the same, I'm like you, you're like me.
+We're all working in harmony.
+Everything is awesome!
+Everything is cool when you're part of a team!
+Everything is awesome!
+When you're living out a dream!
+
+Whoo!
+Three, two, one, go. Have you heard the news?
+Everyone's talking!
+Life is good 'cause everything's awesome!
+Lost my job, there's a new opportunity!
+More free time for my awesome community!
+I feel more awesome than an awesome possum!
+Dip my body in chocolate frosting!
+Three years later, wash off the frosting!
+Smellin' like a blossom.
+Everything is awesome!
+Stepped in mud, got brand new shoes!
+It's awesome to win and it's awesome to lose!
+
+Everything is better when we stick together!
+Side by side, you and I, gonna win forever!
+Let's party forever!
+We're the same, I'm like you, you're like me.
+We're all working in harmony-y-y-y-y-y-y-y.
+Everything is awesome!
+Everything is cool when you're part of a team!
+Everything is awesome!
+When you're living out a dream.](https://youtu.be/g55SloahAj0)"""
+    )
+
+
 @bert.slash_command(name="bert")
 async def _bert(interaction: discord.Interaction):
     """bert"""
     await interaction.response.send_message(interaction.user.mention)
-
-
-@bert.slash_command()
-async def todo(interaction: discord.Interaction):
-    """done"""
-    result = DB.execute(
-        "SELECT * FROM todos WHERE guild = %s", (interaction.guild.id,)
-    ).fetchall()
-
-    if result is None:
-        await interaction.response.send_message("No todo items")
-        return
-
-    embed = discord.Embed(title="Todo List")
-    for row in result:
-        embed.add_field(name=row[1], value=row[2])
-    await interaction.response.send_message(embed=embed, view=Todolist())
 
 
 @bert.slash_command()
@@ -559,10 +728,21 @@ async def decimal_decode(interaction: discord.Interaction, text: str):
     await interaction.response.send_message(decoded)
 
 
+@bert.slash_command()
+@option("category", description="the category to put the VC in")
+async def makevcmaker(
+    interaction: discord.Interaction, category: discord.CategoryChannel = None
+):
+    """Make a voice channel"""
+    vc = await interaction.guild.create_voice_channel(
+        "Join to create VC", category=category
+    )
+    await PB.collection("vcmaker").create({"channel": str(vc.id), "type": "PERMANENT"})
+    await interaction.response.send_message(f"Created {vc.mention}")
+
+
 async def get_videos(ctx: discord.AutocompleteContext):
     """search for videos"""
-    if not ctx.value:
-        return []
     try:
         tracks = await wavelink.Playable.search(ctx.value)
     except wavelink.exceptions.LavalinkLoadException:
@@ -596,10 +776,10 @@ async def play(
 
     tracks = await wavelink.Playable.search(query)
     if not tracks:
-        await interaction.response.send_message("No tracks found")
+        await interaction.response.send_message("No tracks found", ephemeral=True)
         return
 
-    player: wavelink.Player = interaction.guild.voice_client
+    player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
         try:
@@ -640,7 +820,7 @@ async def play(
 @bert.slash_command()
 async def skip(interaction: discord.Interaction):
     """Skip the current song"""
-    player: wavelink.Player = interaction.guild.voice_client
+    player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
         await interaction.response.send_message("Not playing anything")
@@ -657,7 +837,7 @@ async def skip(interaction: discord.Interaction):
 @bert.slash_command()
 async def stop(interaction: discord.Interaction):
     """Stop playing"""
-    player: wavelink.Player = interaction.guild.voice_client
+    player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
         await interaction.response.send_message("Not playing anything")
@@ -675,4 +855,15 @@ async def stop(interaction: discord.Interaction):
     )
 
 
-bert.run(os.getenv("BOT_TOKEN"))
+async def main():
+    try:
+        await pb_login()
+    except PocketbaseError:
+        logger.critical("Failed to login to Pocketbase")
+        sys.exit(111)  # Exit code 111: Connection refused
+    async with bert:
+        await bert.start(os.getenv("BOT_TOKEN"))
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -10,6 +10,7 @@ import sys
 from asyncio import sleep
 from datetime import UTC, datetime, time, timedelta
 from random import choice, randint
+from typing import List
 from zoneinfo import ZoneInfo
 
 import coloredlogs
@@ -20,6 +21,7 @@ import wavelink
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+from ollama import AsyncClient
 from pb import PB, pb_login
 from pocketbase import PocketbaseError  # type: ignore
 from ui.message import StoreMessage
@@ -34,6 +36,8 @@ bert = commands.Bot(
 )
 
 TZ = ZoneInfo(os.getenv("TZ") or "Europe/Amsterdam")
+
+ollama = AsyncClient(host=os.getenv("OLLAMA_URL") or "http://ai:11434")
 
 
 class LogFilter(logging.Filter):
@@ -99,13 +103,31 @@ for event in events:
 logger.info("Found %s upcoming holidays", len(holidays))
 
 
+async def download_ai_models(models: List[str]):
+    """Download the AI models from the Ollama server."""
+    downloaded_models = await ollama.list()
+    for model in models.copy():
+        if any(
+            m["name"].replace(":latest", "") == model
+            for m in downloaded_models["models"]
+        ):
+            models.remove(model)
+    if not models:
+        return
+    logger.debug("Downloading %s AI models (%s)", len(models), ", ".join(models))
+    for model in models:
+        logger.debug("Downloading %s...", model)
+        await ollama.pull(model=model)
+
+
 async def connect_nodes():
     """Connect to our Lavalink nodes."""
     await bert.wait_until_ready()
 
     nodes = [
         wavelink.Node(
-            uri="http://lavalink:2333", password=os.getenv("LAVALINK_PASSWORD")
+            uri=os.getenv("LAVALINK_URL") or "http://lavalink:2333",
+            password=os.getenv("LAVALINK_PASSWORD"),
         )
     ]
     await wavelink.Pool.connect(nodes=nodes, client=bert)
@@ -208,6 +230,35 @@ async def on_message(message: discord.Message):
     if message.channel.name == "silence":
         await message.delete()
         return
+
+    if message.channel.name == "bert-ai":
+        images = []
+        for sticker in message.stickers:
+            if sticker.format.name in ("png", "apng"):
+                images.append(await sticker.read())
+        for attachment in message.attachments:
+            if attachment.content_type.startswith("image"):
+                images.append(await attachment.read())
+        if images:
+            ai_reply = await ollama.generate(
+                model="llava",
+                prompt=message.content or "Describe the following image(s):",
+                images=images,
+            )
+        else:
+            ai_reply = await ollama.generate(
+                model="llama2-uncensored", prompt=message.content
+            )
+
+        if ai_reply["response"]:
+            if len(ai_reply["response"]) > 2000:
+                await message.channel.send(
+                    "_The response is too long to send in one message_"
+                )
+            else:
+                await message.channel.send(ai_reply["response"])
+        else:
+            await message.channel.send("_No response from AI_")
 
 
 @bert.event
@@ -861,6 +912,7 @@ async def main():
     except PocketbaseError:
         logger.critical("Failed to login to Pocketbase")
         sys.exit(111)  # Exit code 111: Connection refused
+    await download_ai_models(["llama2-uncensored", "llava"])
     async with bert:
         await bert.start(os.getenv("BOT_TOKEN"))
 

@@ -1,16 +1,14 @@
 ---
 name: Lint
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+on: # yamllint disable-line rule:truthy
+  push: null
+  pull_request: null
+
+permissions: {}
 
 jobs:
-  build:
+  lint:
     name: Lint
     runs-on: ubuntu-latest
 
@@ -23,6 +21,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+
+      - name: Install Python dependencies
+        run: pip install -r bot/requirements.txt
 
       - name: Install Python 3.12
         uses: actions/setup-python@v5
@@ -42,7 +50,7 @@ jobs:
         run: rm -rf pocketbase/migrations pocketbase/pb_data
 
       - name: Super-linter
-        uses: super-linter/super-linter/slim@v5.7.2
+        uses: super-linter/super-linter/slim@v6.8.0
         env:
           DEFAULT_BRANCH: main
           LINTER_RULES_PATH: /

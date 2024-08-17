@@ -379,7 +379,17 @@ async def on_wavelink_track_end(payload: wavelink.TrackEndEventPayload):
         return
 
     if not payload.player.queue:
-        await payload.player.disconnect()
+        try:
+            sounds = os.listdir("sounds")
+        except FileNotFoundError:
+            sounds = []
+        if payload.track.source != "local" and sounds:
+            bye_sound = await wavelink.Playable.search(
+                f"sounds/{choice(sounds)}", source=None
+            )
+            await payload.player.play(bye_sound[0])
+        else:
+            await payload.player.disconnect()
 
 
 @bert.event

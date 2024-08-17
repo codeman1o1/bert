@@ -64,6 +64,7 @@ services:
       - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD}
     volumes:
       - ./lavalink.yml:/opt/Lavalink/application.yml
+      - ./bot/sounds:/opt/Lavalink/sounds
     restart: unless-stopped
 
 volumes:

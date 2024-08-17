@@ -5,3 +5,4 @@ lavalink:
   server:
     sources:
       youtube: false
+      local: true

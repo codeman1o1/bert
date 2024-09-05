@@ -1,0 +1,90 @@
+name: Update Lavalink plugins
+
+on:
+  schedule:
+    - cron: "0 9 * *  *"
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq &&\
+          chmod +x /usr/bin/yq
+
+      - name: Parse lavalink.yml and update plugin versions
+        id: update_plugins
+        run: |
+          # Create the Markdown file for the PR body
+          PR_BODY_PATH="/tmp/pr_body.md"
+          echo "# Plugin Version Updates" > $PR_BODY_PATH
+          echo "The following Lavalink plugins have been updated:" >> $PR_BODY_PATH
+          echo "" >> $PR_BODY_PATH
+
+          # Iterate over all defined plugins and update their versions
+          PLUGINS=$(yq '.lavalink.plugins[].dependency' lavalink.yml)
+
+          UPDATED=false
+          for PLUGIN in $PLUGINS; do
+            # Remove leading/trailing quotes from the PLUGIN string
+            CLEANED_PLUGIN=$(echo "$PLUGIN" | sed 's/"//g')
+
+            # Extract group, artifact, and current version
+            GROUP=$(echo "$CLEANED_PLUGIN" | cut -d':' -f1)
+            ARTIFACT=$(echo "$CLEANED_PLUGIN" | cut -d':' -f2)
+            CURRENT_VERSION=$(echo "$CLEANED_PLUGIN" | cut -d':' -f3)
+
+            # Replace dots in the GROUP with slashes for the Maven URL path
+            GROUP_PATH=$(echo "$GROUP" | sed 's/\./\//g')
+
+            # Fetch the latest version from Maven repository
+            MAVEN_URL="https://maven.lavalink.dev/releases/$GROUP_PATH/$ARTIFACT/maven-metadata.xml"
+            LATEST_VERSION=$(curl -s "$MAVEN_URL" | grep -oPm1 "(?<=<release>)[^<]+")
+            PLUGIN_URL="https://maven.lavalink.dev/releases/$GROUP_PATH/$ARTIFACT/"
+
+            if [ -n "$LATEST_VERSION" ] && [ "$LATEST_VERSION" != "$CURRENT_VERSION" ]; then
+              echo "Updating $GROUP:$ARTIFACT from version $CURRENT_VERSION to $LATEST_VERSION"
+              
+              # Update the version in lavalink.yml
+              sed -i "s|$GROUP:$ARTIFACT:$CURRENT_VERSION|$GROUP:$ARTIFACT:$LATEST_VERSION|" lavalink.yml
+              
+              # Add to the PR body the plugin that was updated with the URL
+              echo "- **[$GROUP:$ARTIFACT]($PLUGIN_URL)**: `$CURRENT_VERSION` → `$LATEST_VERSION`" >> $PR_BODY_PATH
+              
+              UPDATED=true
+            else
+              echo "No update found for $GROUP:$ARTIFACT (current version $CURRENT_VERSION)"
+            fi
+          done
+
+          if [ "$UPDATED" = true ]; then
+            echo "" >> $PR_BODY_PATH
+            echo "Please review the changes and merge if appropriate." >> $PR_BODY_PATH
+          else
+            echo "No plugin updates found." > $PR_BODY_PATH
+          fi
+
+          # Set the output if any update was made
+          echo "::set-output name=updated::$UPDATED"
+
+      - name: Create pull request
+        if: steps.update_plugins.outputs.updated == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Bump Lavalink plugin versions"
+          title: ":sparkles: Bump Lavalink plugin versions :sparkles:"
+          body-path: /tmp/pr-body.md
+          branch: update-lavalink-plugins
+          labels: dependencies
+          assignees: github-actions[bot]

@@ -59,7 +59,7 @@ jobs:
               sed -i "s|$GROUP:$ARTIFACT:$CURRENT_VERSION|$GROUP:$ARTIFACT:$LATEST_VERSION|" lavalink.yml
               
               # Add to the PR body the plugin that was updated with the URL
-              echo "- **[$GROUP:$ARTIFACT]($PLUGIN_URL)**: `$CURRENT_VERSION` → `$LATEST_VERSION`" >> $PR_BODY_PATH
+              echo "- **[$GROUP:$ARTIFACT]($PLUGIN_URL)**: \`$CURRENT_VERSION\` → \`$LATEST_VERSION\`" >> $PR_BODY_PATH
               
               UPDATED=true
             else
@@ -75,7 +75,7 @@ jobs:
           fi
 
           # Set the output if any update was made
-          echo "::set-output name=updated::$UPDATED"
+          echo "updated=$UPDATED" >> $GITHUB_OUTPUT
 
       - name: Create pull request
         if: steps.update_plugins.outputs.updated == 'true'

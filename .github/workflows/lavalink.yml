@@ -50,7 +50,7 @@ jobs:
             # Fetch the latest version from Maven repository
             MAVEN_URL="https://maven.lavalink.dev/releases/$GROUP_PATH/$ARTIFACT/maven-metadata.xml"
             LATEST_VERSION=$(curl -s "$MAVEN_URL" | grep -oPm1 "(?<=<release>)[^<]+")
-            PLUGIN_URL="https://maven.lavalink.dev/releases/$GROUP_PATH/$ARTIFACT/"
+            PLUGIN_URL="https://maven.lavalink.dev/#/releases/$GROUP_PATH/$ARTIFACT/"
 
             if [ -n "$LATEST_VERSION" ] && [ "$LATEST_VERSION" != "$CURRENT_VERSION" ]; then
               echo "Updating $GROUP:$ARTIFACT from version $CURRENT_VERSION to $LATEST_VERSION"
@@ -87,4 +87,3 @@ jobs:
           body-path: /tmp/pr-body.md
           branch: update-lavalink-plugins
           labels: dependencies
-          assignees: github-actions[bot]

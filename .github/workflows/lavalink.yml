@@ -26,7 +26,7 @@ jobs:
         id: update_plugins
         run: |
           # Create the Markdown file for the PR body
-          PR_BODY_PATH="/tmp/pr_body.md"
+          PR_BODY_PATH="/tmp/pr-body.md"
           echo "# Plugin Version Updates" > $PR_BODY_PATH
           echo "The following Lavalink plugins have been updated:" >> $PR_BODY_PATH
           echo "" >> $PR_BODY_PATH

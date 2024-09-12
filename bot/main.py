@@ -30,7 +30,7 @@ load_dotenv()
 bert = commands.Bot(
     command_prefix="bert ",
     intents=discord.Intents.all(),
-    # debug_guilds=[870973430114181141, 1182803938517455008],
+    debug_guilds=[870973430114181141, 1182803938517455008],
 )
 
 TZ = ZoneInfo(os.getenv("TZ") or "Europe/Amsterdam")
@@ -179,6 +179,8 @@ async def clean_db():
 
 @bert.event
 async def on_ready():
+    global team_members
+    team_members = [member.id for member in (await bert.application_info()).team.members]
     logger.info("%s is ready to hurt your brain", bert.user.name)
 
     logger.info("Connecting to Lavalink nodes")
@@ -191,7 +193,6 @@ async def on_ready():
     if not send_holiday.is_running():
         logger.info("Starting holiday task")
         send_holiday.start()
-
     await clean_db()
 
 
@@ -315,7 +316,10 @@ async def on_voice_state_update(
         # Can't mute bert hehehe
         await member.edit(mute=False)
         return
-
+    #mute command
+    if before.mute and not after.mute and member.id in muted_users:
+            await member.edit(mute=True)
+            return
     if before.channel != after.channel:  # User moved channels
         if before.channel:
             if not [
@@ -494,6 +498,52 @@ async def _bert(interaction: discord.Interaction):
     """bert"""
     await interaction.response.send_message(interaction.user.mention)
 
+muted_users = set()
+unmutables = (747766456820695072,)
+
+@bert.user_command()
+@bert.slash_command()
+async def mute(interaction: discord.Interaction, user: discord.Member):
+    """Mute a user permanently"""
+    if user.bot:
+        await interaction.response.send_message("You can't mute a bot", ephemeral=True)
+        return
+    if user.id in team_members or user.id in unmutables:
+        await interaction.response.send_message("nuh uh", ephemeral=True)
+        return
+    if user == interaction.user:
+        await interaction.response.send_message("You can't mute yourself", ephemeral=True)
+        return
+    if user.id in muted_users:
+        await interaction.response.send_message(f"{user.display_name} is already muted", ephemeral=True)
+        return
+    muted_users.add(user.id)
+    await interaction.response.send_message(f"Muted {user.display_name}", ephemeral=True)
+    if user.voice is None:
+        return
+    await user.edit(mute=True)
+
+@bert.user_command()
+@bert.slash_command()
+async def unmute(interaction: discord.Interaction, user: discord.Member):
+    """Unmute a user"""
+    if user.bot:
+        await interaction.response.send_message("You can't unmute a bot", ephemeral=True, delete_after=5)
+        return
+    if user.id in team_members or user.id in unmutables:
+        await interaction.response.send_message("nuh uh", ephemeral=True, delete_after=5)
+        return
+    if user == interaction.user:
+        await interaction.response.send_message("You can't unmute yourself", ephemeral=True, delete_after=5)
+        return
+    if user.id not in muted_users:
+        await interaction.response.send_message(f"{user.display_name} is not muted", ephemeral=True, delete_after=5)
+        return
+    muted_users.remove(user.id)
+    await interaction.response.send_message(f"Unmuted {user.display_name}", ephemeral=True, delete_after=5)
+    if user.voice is None:
+        return
+    await user.edit(mute=False)
 
 @bert.slash_command()
 @option("user", description="The user to send messages to")

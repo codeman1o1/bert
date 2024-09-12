@@ -179,8 +179,6 @@ async def clean_db():
 
 @bert.event
 async def on_ready():
-    global team_members
-    team_members = [member.id for member in (await bert.application_info()).team.members]
     logger.info("%s is ready to hurt your brain", bert.user.name)
 
     logger.info("Connecting to Lavalink nodes")
@@ -508,7 +506,7 @@ async def mute(interaction: discord.Interaction, user: discord.Member):
     if user.bot:
         await interaction.response.send_message("You can't mute a bot", ephemeral=True)
         return
-    if user.id in team_members or user.id in unmutables:
+    if user.id in [member.id for member in (await bert.application_info()).team.members] or user.id in unmutables:
         await interaction.response.send_message("nuh uh", ephemeral=True)
         return
     if user == interaction.user:
@@ -528,19 +526,19 @@ async def mute(interaction: discord.Interaction, user: discord.Member):
 async def unmute(interaction: discord.Interaction, user: discord.Member):
     """Unmute a user"""
     if user.bot:
-        await interaction.response.send_message("You can't unmute a bot", ephemeral=True, delete_after=5)
+        await interaction.response.send_message("You can't unmute a bot", ephemeral=True)
         return
-    if user.id in team_members or user.id in unmutables:
-        await interaction.response.send_message("nuh uh", ephemeral=True, delete_after=5)
+    if user.id in [member.id for member in (await bert.application_info()).team.members] or user.id in unmutables:
+        await interaction.response.send_message("nuh uh", ephemeral=True)
         return
     if user == interaction.user:
-        await interaction.response.send_message("You can't unmute yourself", ephemeral=True, delete_after=5)
+        await interaction.response.send_message("You can't unmute yourself", ephemeral=True)
         return
     if user.id not in muted_users:
-        await interaction.response.send_message(f"{user.display_name} is not muted", ephemeral=True, delete_after=5)
+        await interaction.response.send_message(f"{user.display_name} is not muted", ephemeral=True)
         return
     muted_users.remove(user.id)
-    await interaction.response.send_message(f"Unmuted {user.display_name}", ephemeral=True, delete_after=5)
+    await interaction.response.send_message(f"Unmuted {user.display_name}", ephemeral=True)
     if user.voice is None:
         return
     await user.edit(mute=False)

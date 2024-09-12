@@ -13,11 +13,11 @@ updates:
     schedule:
       interval: "monthly"
     groups:
-      prettier-eslint:
+      linter:
         patterns:
           - "*prettier*"
           - "*eslint*"
-      nuxt-vue:
+      vue:
         patterns:
           - "*nuxt*"
           - "*vue*"

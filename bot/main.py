@@ -223,9 +223,15 @@ async def on_member_join(member: discord.Member):
             "oh god daar is",
             "d'r is er een jarig hoera hoera dat kun je wel zien dat is",
         )
-        await member.guild.system_channel.send(
-            f"{choice(bonjour_msgs)} {member.display_name}"
-        )
+        app_info = await bert.application_info()
+        if member in app_info.team.members:
+            await member.guild.system_channel.send(
+                f"Ladies and gentlemen, please welcome {app_info.team.name} member **{member.display_name}**"
+            )
+        else:
+            await member.guild.system_channel.send(
+                f"{choice(bonjour_msgs)} {member.display_name}"
+            )
         with contextlib.suppress(discord.Forbidden):
             await member.send(f"{choice(bonjour_msgs)} {member.display_name}")
     elif bot_role := discord.utils.find(

@@ -30,7 +30,7 @@ load_dotenv()
 bert = commands.Bot(
     command_prefix="bert ",
     intents=discord.Intents.all(),
-    debug_guilds=[870973430114181141, 1182803938517455008],
+    # debug_guilds=[870973430114181141, 1182803938517455008],
 )
 
 TZ = ZoneInfo(os.getenv("TZ") or "Europe/Amsterdam")

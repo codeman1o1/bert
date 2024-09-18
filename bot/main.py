@@ -316,6 +316,11 @@ async def on_voice_state_update(
         await member.edit(mute=False)
         return
 
+    # Mute command
+    if before.mute and not after.mute and member.id in muted_users:
+        await member.edit(mute=True)
+        return
+
     if before.channel != after.channel:  # User moved channels
         if before.channel:
             if not [
@@ -493,6 +498,68 @@ When you're living out a dream.](https://youtu.be/g55SloahAj0)"""
 async def _bert(interaction: discord.Interaction):
     """bert"""
     await interaction.response.send_message(interaction.user.mention)
+
+
+muted_users = set()
+unmutables = (747766456820695072,)
+
+
+@bert.slash_command()
+@bert.user_command()
+async def mute(interaction: discord.Interaction, user: discord.Member):
+    """Mute a user permanently"""
+    if user == interaction.user:
+        await interaction.response.send_message(
+            "You can't mute yourself", ephemeral=True
+        )
+        return
+    if user.bot:
+        await interaction.response.send_message("You can't mute a bot", ephemeral=True)
+        return
+    if user.id in muted_users:
+        await interaction.response.send_message(
+            f"{user.display_name} is already muted", ephemeral=True
+        )
+        return
+    if user.id in unmutables or user in (await bert.application_info()).team.members:
+        await interaction.response.send_message("nuh uh", ephemeral=True)
+        return
+    muted_users.add(user.id)
+    await interaction.response.send_message(
+        f"Muted {user.display_name}", ephemeral=True
+    )
+    if user.voice:
+        await user.edit(mute=True)
+
+
+@bert.slash_command()
+@bert.user_command()
+async def unmute(interaction: discord.Interaction, user: discord.Member):
+    """Unmute a user"""
+    if user == interaction.user:
+        await interaction.response.send_message(
+            "You can't unmute yourself", ephemeral=True
+        )
+        return
+    if user.bot:
+        await interaction.response.send_message(
+            "You can't unmute a bot", ephemeral=True
+        )
+        return
+    if user.id not in muted_users:
+        await interaction.response.send_message(
+            f"{user.display_name} is not muted", ephemeral=True
+        )
+        return
+    if user.id in unmutables or user in (await bert.application_info()).team.members:
+        await interaction.response.send_message("nuh uh", ephemeral=True)
+        return
+    muted_users.remove(user.id)
+    await interaction.response.send_message(
+        f"Unmuted {user.display_name}", ephemeral=True
+    )
+    if user.voice:
+        await user.edit(mute=False)
 
 
 @bert.slash_command()

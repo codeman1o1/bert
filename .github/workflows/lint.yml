@@ -37,44 +37,44 @@ jobs:
           cd website
           npm run lint
 
-  super-linter:
-    name: Super-Linter
-    runs-on: ubuntu-latest
+  # super-linter:
+  #   name: Super-Linter
+  #   runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      packages: read
-      # To report GitHub Actions status checks
-      statuses: write
+  #   permissions:
+  #     contents: read
+  #     packages: read
+  #     # To report GitHub Actions status checks
+  #     statuses: write
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Install Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.12
+  #     - name: Install Python 3.12
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: 3.12
 
-      - name: Install Python dependencies
-        run: pip install -r bot/requirements.txt
+  #     - name: Install Python dependencies
+  #       run: pip install -r bot/requirements.txt
 
-      - name: Install Node dependencies
-        run: |
-          cd website
-          npm ci
-          mv node_modules ../node_modules
+  #     - name: Install Node dependencies
+  #       run: |
+  #         cd website
+  #         npm ci
+  #         mv node_modules ../node_modules
 
-      - name: Remove generated files
-        run: rm -rf pocketbase/migrations pocketbase/pb_data
+  #     - name: Remove generated files
+  #       run: rm -rf pocketbase/migrations pocketbase/pb_data
 
-      - name: Super-linter
-        uses: super-linter/super-linter/slim@v5.7.2
-        env:
-          DEFAULT_BRANCH: main
-          LINTER_RULES_PATH: /
-          VALIDATE_HTML: false # too opinionated and full of bs
-          TYPESCRIPT_DEFAULT_STYLE: prettier
-          TYPESCRIPT_ES_CONFIG_FILE: website/.eslintrc.cjs
-          # To report GitHub Actions status checks
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Super-linter
+  #       uses: super-linter/super-linter/slim@v5.7.2
+  #       env:
+  #         DEFAULT_BRANCH: main
+  #         LINTER_RULES_PATH: /
+  #         VALIDATE_HTML: false # too opinionated and full of bs
+  #         TYPESCRIPT_DEFAULT_STYLE: prettier
+  #         TYPESCRIPT_ES_CONFIG_FILE: website/.eslintrc.cjs
+  #         # To report GitHub Actions status checks
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

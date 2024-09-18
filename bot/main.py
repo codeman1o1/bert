@@ -521,7 +521,7 @@ async def mute(interaction: discord.Interaction, user: discord.Member):
             f"{user.display_name} is already muted", ephemeral=True
         )
         return
-    if user in (await bert.application_info()).team.members or user.id in unmutables:
+    if user.id in unmutables or user in (await bert.application_info()).team.members:
         await interaction.response.send_message("nuh uh", ephemeral=True)
         return
     muted_users.add(user.id)
@@ -551,7 +551,7 @@ async def unmute(interaction: discord.Interaction, user: discord.Member):
             f"{user.display_name} is not muted", ephemeral=True
         )
         return
-    if user in (await bert.application_info()).team.members or user.id in unmutables:
+    if user.id in unmutables or user in (await bert.application_info()).team.members:
         await interaction.response.send_message("nuh uh", ephemeral=True)
         return
     muted_users.remove(user.id)

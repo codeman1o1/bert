@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from ollama import AsyncClient
 from pb import PB, pb_login
 from pocketbase import PocketbaseError  # type: ignore
+from ui.message import StoreMessage
 from ui.musik import AddBack, RestoreQueue
 
 load_dotenv()
@@ -273,9 +274,15 @@ async def on_member_join(member: discord.Member):
             "oh god daar is",
             "d'r is er een jarig hoera hoera dat kun je wel zien dat is",
         )
-        await member.guild.system_channel.send(
-            f"{choice(bonjour_msgs)} {member.display_name}"
-        )
+        app_info = await bert.application_info()
+        if member in app_info.team.members:
+            await member.guild.system_channel.send(
+                f"Ladies and gentlemen, please welcome {app_info.team.name} member **{member.display_name}**"
+            )
+        else:
+            await member.guild.system_channel.send(
+                f"{choice(bonjour_msgs)} {member.display_name}"
+            )
         with contextlib.suppress(discord.Forbidden):
             await member.send(f"{choice(bonjour_msgs)} {member.display_name}")
     elif bot_role := discord.utils.find(
@@ -360,6 +367,11 @@ async def on_voice_state_update(
         await member.edit(mute=False)
         return
 
+    # Mute command
+    if before.mute and not after.mute and member.id in muted_users:
+        await member.edit(mute=True)
+        return
+
     if before.channel != after.channel:  # User moved channels
         if before.channel:
             if not [
@@ -429,7 +441,17 @@ async def on_wavelink_track_end(payload: wavelink.TrackEndEventPayload):
         return
 
     if not payload.player.queue:
-        await payload.player.disconnect()
+        try:
+            sounds = os.listdir("sounds")
+        except FileNotFoundError:
+            sounds = []
+        if payload.track.source != "local" and sounds:
+            bye_sound = await wavelink.Playable.search(
+                f"sounds/{choice(sounds)}", source=None
+            )
+            await payload.player.play(bye_sound[0])
+        else:
+            await payload.player.disconnect()
 
 
 @bert.event
@@ -437,10 +459,158 @@ async def on_wavelink_node_ready(payload: wavelink.NodeReadyEventPayload):
     logger.info("Lavalink node %s is ready", payload.node.identifier)
 
 
+message_group = bert.create_group(
+    "message",
+    "message storage",
+    integration_types={discord.IntegrationType.user_install},
+)
+
+
+@message_group.command()
+async def store(interaction: discord.Interaction):
+    """Store a message that can be retrieved later"""
+    await interaction.response.send_modal(StoreMessage())
+
+
+@message_group.command()
+@option("key", description="The key of the message to retrieve")
+async def load(interaction: discord.Interaction, key: str):
+    """Retrieve a stored message"""
+    try:
+        row = await PB.collection("messages").get_first({"filter": f"id='{key}'"})
+        await interaction.response.send_message(row["message"], ephemeral=True)
+    except PocketbaseError:
+        await interaction.response.send_message(
+            "No message found with that key", ephemeral=True
+        )
+
+
+@message_group.command()
+@option("key", description="The key of the message to delete")
+async def delete(interaction: discord.Interaction, key: str):
+    """Delete a stored message"""
+    try:
+        await PB.collection("messages").get_first(
+            {"filter": f"id='{key}' && user_id='{str(interaction.user.id)}'"}
+        )
+        await PB.collection("messages").delete(key)
+        await interaction.response.send_message("Message deleted", ephemeral=True)
+    except PocketbaseError:
+        await interaction.response.send_message(
+            "No message found with that key", ephemeral=True
+        )
+
+
+@bert.slash_command(integration_types={discord.IntegrationType.user_install})
+async def everythingisawesome(interaction: discord.Interaction):
+    """Everything is AWESOME"""
+    await interaction.response.send_message(
+        """[Everything is awesome!
+Everything is cool when you're part of a team!
+Everything is awesome!
+When you're living out a dream!
+Everything thing is better when we stick together!
+Side by side, you and I, gonna win forever!
+Let's party forever!
+We're the same, I'm like you, you're like me.
+We're all working in harmony.
+Everything is awesome!
+Everything is cool when you're part of a team!
+Everything is awesome!
+When you're living out a dream!
+
+Whoo!
+Three, two, one, go. Have you heard the news?
+Everyone's talking!
+Life is good 'cause everything's awesome!
+Lost my job, there's a new opportunity!
+More free time for my awesome community!
+I feel more awesome than an awesome possum!
+Dip my body in chocolate frosting!
+Three years later, wash off the frosting!
+Smellin' like a blossom.
+Everything is awesome!
+Stepped in mud, got brand new shoes!
+It's awesome to win and it's awesome to lose!
+
+Everything is better when we stick together!
+Side by side, you and I, gonna win forever!
+Let's party forever!
+We're the same, I'm like you, you're like me.
+We're all working in harmony-y-y-y-y-y-y-y.
+Everything is awesome!
+Everything is cool when you're part of a team!
+Everything is awesome!
+When you're living out a dream.](https://youtu.be/g55SloahAj0)"""
+    )
+
+
 @bert.slash_command(name="bert")
 async def _bert(interaction: discord.Interaction):
     """bert"""
     await interaction.response.send_message(interaction.user.mention)
+
+
+muted_users = set()
+unmutables = (747766456820695072,)
+
+
+@bert.slash_command()
+@bert.user_command()
+async def mute(interaction: discord.Interaction, user: discord.Member):
+    """Mute a user permanently"""
+    if user == interaction.user:
+        await interaction.response.send_message(
+            "You can't mute yourself", ephemeral=True
+        )
+        return
+    if user.bot:
+        await interaction.response.send_message("You can't mute a bot", ephemeral=True)
+        return
+    if user.id in muted_users:
+        await interaction.response.send_message(
+            f"{user.display_name} is already muted", ephemeral=True
+        )
+        return
+    if user.id in unmutables or user in (await bert.application_info()).team.members:
+        await interaction.response.send_message("nuh uh", ephemeral=True)
+        return
+    muted_users.add(user.id)
+    await interaction.response.send_message(
+        f"Muted {user.display_name}", ephemeral=True
+    )
+    if user.voice:
+        await user.edit(mute=True)
+
+
+@bert.slash_command()
+@bert.user_command()
+async def unmute(interaction: discord.Interaction, user: discord.Member):
+    """Unmute a user"""
+    if user == interaction.user:
+        await interaction.response.send_message(
+            "You can't unmute yourself", ephemeral=True
+        )
+        return
+    if user.bot:
+        await interaction.response.send_message(
+            "You can't unmute a bot", ephemeral=True
+        )
+        return
+    if user.id not in muted_users:
+        await interaction.response.send_message(
+            f"{user.display_name} is not muted", ephemeral=True
+        )
+        return
+    if user.id in unmutables or user in (await bert.application_info()).team.members:
+        await interaction.response.send_message("nuh uh", ephemeral=True)
+        return
+    muted_users.remove(user.id)
+    await interaction.response.send_message(
+        f"Unmuted {user.display_name}", ephemeral=True
+    )
+    if user.voice:
+        await user.edit(mute=False)
 
 
 @bert.slash_command()
@@ -743,7 +913,7 @@ async def play(
         await interaction.response.send_message("No tracks found", ephemeral=True)
         return
 
-    player: wavelink.Player = interaction.guild.voice_client
+    player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
         try:
@@ -784,7 +954,7 @@ async def play(
 @bert.slash_command()
 async def skip(interaction: discord.Interaction):
     """Skip the current song"""
-    player: wavelink.Player = interaction.guild.voice_client
+    player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
         await interaction.response.send_message("Not playing anything")
@@ -801,7 +971,7 @@ async def skip(interaction: discord.Interaction):
 @bert.slash_command()
 async def stop(interaction: discord.Interaction):
     """Stop playing"""
-    player: wavelink.Player = interaction.guild.voice_client
+    player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
         await interaction.response.send_message("Not playing anything")

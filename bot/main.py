@@ -20,8 +20,8 @@ import wavelink
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from pb import PB, pb_login
 from pocketbase import PocketbaseError  # type: ignore
+from pb import PB, pb_login
 from ui.message import StoreMessage
 from ui.musik import AddBack, RestoreQueue
 

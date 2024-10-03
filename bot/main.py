@@ -20,7 +20,7 @@ import wavelink
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from pocketbase import PocketbaseError  # type: ignore
+from pocketbase import PocketBaseError  # type: ignore
 from pb import PB, pb_login
 from ui.message import StoreMessage
 from ui.musik import AddBack, RestoreQueue
@@ -329,7 +329,7 @@ async def on_voice_state_update(
                 if player := member.guild.voice_client:
                     await player.disconnect()
 
-                with contextlib.suppress(PocketbaseError):
+                with contextlib.suppress(PocketBaseError):
                     row = await PB.collection("vcmaker").get_first(
                         {
                             "filter": f"channel='{str(before.channel.id)}' && type='TEMPORARY'"
@@ -342,7 +342,7 @@ async def on_voice_state_update(
                         await before.channel.delete()
                     await PB.collection("vcmaker").delete(row["id"])
             else:
-                with contextlib.suppress(PocketbaseError):
+                with contextlib.suppress(PocketBaseError):
                     await PB.collection("vcmaker").get_first(
                         {
                             "filter": f"channel='{str(before.channel.id)}' && type='TEMPORARY'"
@@ -352,7 +352,7 @@ async def on_voice_state_update(
                     await edit_vc_name(before.channel, vc_name)
 
         if after.channel:
-            with contextlib.suppress(PocketbaseError):
+            with contextlib.suppress(PocketBaseError):
                 result = await PB.collection("vcmaker").get_first(
                     {"filter": f"channel='{str(after.channel.id)}'"}
                 )
@@ -428,7 +428,7 @@ async def load(interaction: discord.Interaction, key: str):
     try:
         row = await PB.collection("messages").get_first({"filter": f"id='{key}'"})
         await interaction.response.send_message(row["message"], ephemeral=True)
-    except PocketbaseError:
+    except PocketBaseError:
         await interaction.response.send_message(
             "No message found with that key", ephemeral=True
         )
@@ -444,7 +444,7 @@ async def delete(interaction: discord.Interaction, key: str):
         )
         await PB.collection("messages").delete(key)
         await interaction.response.send_message("Message deleted", ephemeral=True)
-    except PocketbaseError:
+    except PocketBaseError:
         await interaction.response.send_message(
             "No message found with that key", ephemeral=True
         )
@@ -985,7 +985,7 @@ async def stop(interaction: discord.Interaction):
 async def main():
     try:
         await pb_login()
-    except PocketbaseError:
+    except PocketBaseError:
         logger.critical("Failed to login to Pocketbase")
         sys.exit(111)  # Exit code 111: Connection refused
     async with bert:

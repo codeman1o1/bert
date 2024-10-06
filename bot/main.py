@@ -549,6 +549,39 @@ async def delete(interaction: discord.Interaction, key: str):
         )
 
 
+async def autocomplete_models(ctx: discord.AutocompleteContext):
+    """Autocomplete the AI models from the Ollama server."""
+    models = (await ollama.list())["models"]
+    return [
+        discord.OptionChoice(model["name"].split(":")[0])
+        for model in models
+        if ctx.value in model["name"].split(":")[0]
+    ]
+
+
+@bert.slash_command(
+    integration_types={
+        discord.IntegrationType.guild_install,
+        discord.IntegrationType.user_install,
+    }
+)
+@option("prompt", description="The prompt to give to the AI")
+@option("model", description="The model to use", autocomplete=autocomplete_models)
+async def ai(interaction: discord.Interaction, prompt: str, model: str = "llama3.2"):
+    """Bert AI Technologies Ltd."""
+    await interaction.response.defer()
+    ai_response = await ollama.generate(model, prompt)
+    if response := ai_response["response"]:
+        if len(response) > 2000:
+            await interaction.followup.send(
+                "_The response is too long to send in one message_"
+            )
+        else:
+            await interaction.followup.send(response)
+    else:
+        await interaction.followup.send("_No response from AI_")
+
+
 @bert.slash_command(integration_types={discord.IntegrationType.user_install})
 async def everythingisawesome(interaction: discord.Interaction):
     """Everything is AWESOME"""

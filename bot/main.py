@@ -235,18 +235,38 @@ async def on_message(message: discord.Message):
         available_models = [
             model["name"].split(":")[0] for model in (await ollama.list())["models"]
         ]
+        model = "llama2-uncensored"
 
         if message.content == "bert clear":
             await message.channel.send("Understood. ||bert-ignore||")
             return
 
-        if message.content.startswith("bert model "):
-            if (model := message.content.split(" ")[2]) in available_models:
-                await message.channel.send(f"Model set to {model}. ||bert-ignore||")
+        if message.content.startswith("bert model"):
+            if len(message.content.split(" ")) == 2:
+                history = await message.channel.history(
+                    limit=100,
+                    before=message.created_at,
+                    after=message.created_at - timedelta(minutes=10),
+                ).flatten()
+                history.reverse()
+                for msg in history:
+                    if "bert-ignore" not in msg.content and not msg.author.bot:
+                        if msg.content == "bert clear":
+                            break
+                        if (
+                            msg.content.startswith("bert model ")
+                            and msg.content.split(" ")[2] in available_models
+                        ):
+                            model = msg.content.split(" ")[2]
+                            break
+                await message.channel.send(f"Current model is {model}. ||bert-ignore||")
             else:
-                await message.channel.send(
-                    f"Model {model} is not available. ||bert-ignore||"
-                )
+                if (model := message.content.split(" ")[2]) in available_models:
+                    await message.channel.send(f"Model set to {model}. ||bert-ignore||")
+                else:
+                    await message.channel.send(
+                        f"Model {model} is not available. ||bert-ignore||"
+                    )
             return
 
         async with message.channel.typing():
@@ -258,7 +278,6 @@ async def on_message(message: discord.Message):
                 if attachment.content_type.startswith("image"):
                     images.append(await attachment.read())
 
-            model = "llama2-uncensored"
             messages = []
             history = await message.channel.history(
                 limit=100,

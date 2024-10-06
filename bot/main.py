@@ -22,8 +22,8 @@ from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from ollama import AsyncClient
+from pocketbase import PocketBaseError  # type: ignore
 from pb import PB, pb_login
-from pocketbase import PocketbaseError  # type: ignore
 from ui.message import StoreMessage
 from ui.musik import AddBack, RestoreQueue
 
@@ -380,7 +380,7 @@ async def on_voice_state_update(
                 if player := member.guild.voice_client:
                     await player.disconnect()
 
-                with contextlib.suppress(PocketbaseError):
+                with contextlib.suppress(PocketBaseError):
                     row = await PB.collection("vcmaker").get_first(
                         {
                             "filter": f"channel='{str(before.channel.id)}' && type='TEMPORARY'"
@@ -393,7 +393,7 @@ async def on_voice_state_update(
                         await before.channel.delete()
                     await PB.collection("vcmaker").delete(row["id"])
             else:
-                with contextlib.suppress(PocketbaseError):
+                with contextlib.suppress(PocketBaseError):
                     await PB.collection("vcmaker").get_first(
                         {
                             "filter": f"channel='{str(before.channel.id)}' && type='TEMPORARY'"
@@ -403,7 +403,7 @@ async def on_voice_state_update(
                     await edit_vc_name(before.channel, vc_name)
 
         if after.channel:
-            with contextlib.suppress(PocketbaseError):
+            with contextlib.suppress(PocketBaseError):
                 result = await PB.collection("vcmaker").get_first(
                     {"filter": f"channel='{str(after.channel.id)}'"}
                 )
@@ -479,7 +479,7 @@ async def load(interaction: discord.Interaction, key: str):
     try:
         row = await PB.collection("messages").get_first({"filter": f"id='{key}'"})
         await interaction.response.send_message(row["message"], ephemeral=True)
-    except PocketbaseError:
+    except PocketBaseError:
         await interaction.response.send_message(
             "No message found with that key", ephemeral=True
         )
@@ -495,7 +495,7 @@ async def delete(interaction: discord.Interaction, key: str):
         )
         await PB.collection("messages").delete(key)
         await interaction.response.send_message("Message deleted", ephemeral=True)
-    except PocketbaseError:
+    except PocketBaseError:
         await interaction.response.send_message(
             "No message found with that key", ephemeral=True
         )
@@ -542,6 +542,50 @@ Everything is awesome!
 Everything is cool when you're part of a team!
 Everything is awesome!
 When you're living out a dream.](https://youtu.be/g55SloahAj0)"""
+    )
+
+
+@bert.slash_command(integration_types={discord.IntegrationType.user_install})
+async def everythingisawesomebutinkorean(interaction: discord.Interaction):
+    """Everything is AWESOME but in Korean"""
+    await interaction.response.send_message(
+        """[모든 게 멋진 거야!
+팀의 일원이면 모든 게 멋진 거야!
+모든 게 멋진 거야!
+꿈을 살아갈 때!
+함께 뭉치면 모든 게 더 좋아져!
+나랑 나란히, 영원히 이길 거야!
+영원히 파티하자!
+우리는 똑같아, 난 너와 같고, 넌 나와 같아.
+우리 모두 조화롭게 일하고 있어.
+모든 게 멋진 거야!
+팀의 일원이면 모든 게 멋진 거야!
+모든 게 멋진 거야!
+꿈을 살아갈 때!
+
+후!
+셋, 둘, 하나, 출발. 소식 들었어?
+모두가 떠들어!
+인생은 괜찮아, 모든 게 멋진 거니까!
+직장을 잃었지만 새로운 기회가 생겼어!
+멋진 커뮤니티를 위한 자유 시간이 더 많아졌어!
+멋진 오소리보다 더 멋진 기분이야!
+초콜릿 프로스팅에 몸을 담갔어!
+3년 후, 프로스팅을 씻어냈어!
+꽃향기가 나.
+모든 게 멋진 거야!
+진흙탕을 밟았는데, 새 신발을 신었어!
+이기는 것도 굉장하고 지는 것도 굉장해!
+
+우리가 함께할 때 모든 게 더 좋아!
+나란히, 너와 나, 영원히 이길 거야!
+영원히 파티하자!
+우리는 똑같아, 나는 너와 같고, 너는 나와 같아.
+우리는 모두 조화를 이루며 일하고 있어-y-y-y-y-y-y-y.
+모든 게 굉장해!
+팀의 일원이 되면 모든 게 멋져!
+모든 게 굉장해!
+꿈을 이룰 때.](https://youtu.be/g55SloahAj0)"""
     )
 
 
@@ -992,7 +1036,7 @@ async def stop(interaction: discord.Interaction):
 async def main():
     try:
         await pb_login()
-    except PocketbaseError:
+    except PocketBaseError:
         logger.critical("Failed to login to Pocketbase")
         sys.exit(111)  # Exit code 111: Connection refused
     await download_ai_models(["llama2-uncensored", "llava"])

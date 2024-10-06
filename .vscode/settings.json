@@ -1,0 +1,5 @@
+{
+	"pylint.cwd": "${workspaceFolder}/bot",
+	"black-formatter.cwd": "${workspaceFolder}/bot",
+	"flake8.cwd": "${workspaceFolder}/bot"
+}

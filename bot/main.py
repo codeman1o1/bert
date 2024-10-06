@@ -233,8 +233,7 @@ async def on_message(message: discord.Message):
 
     if message.channel.name == "bert-ai":
         available_models = [
-            model["name"].split(":")[0]
-            for model in (await ollama.list())["models"]
+            model["name"].split(":")[0] for model in (await ollama.list())["models"]
         ]
 
         if message.content == "bert clear":
@@ -245,7 +244,9 @@ async def on_message(message: discord.Message):
             if (model := message.content.split(" ")[2]) in available_models:
                 await message.channel.send(f"Model set to {model}. ||bert-ignore||")
             else:
-                await message.channel.send(f"Model {model} is not available. ||bert-ignore||")
+                await message.channel.send(
+                    f"Model {model} is not available. ||bert-ignore||"
+                )
             return
 
         async with message.channel.typing():
@@ -269,7 +270,9 @@ async def on_message(message: discord.Message):
                 if "bert-ignore" not in msg.content:
                     if msg.author.bot:
                         if msg.author == bert.user:
-                            messages.append({"role": "assistant", "content": msg.content})
+                            messages.append(
+                                {"role": "assistant", "content": msg.content}
+                            )
                     elif msg.content == "bert clear":
                         messages.clear()
                     elif msg.content.startswith("bert model "):
@@ -284,10 +287,16 @@ async def on_message(message: discord.Message):
                             if attachment.content_type.startswith("image"):
                                 images.append(await attachment.read())
 
-                        messages.append({"role": "user", "content": msg.content, "images": images})
-            messages.append({"role": "user", "content": message.content, "images": images})
+                        messages.append(
+                            {"role": "user", "content": msg.content, "images": images}
+                        )
+            messages.append(
+                {"role": "user", "content": message.content, "images": images}
+            )
 
-            ai_reply = await ollama.chat("llava" if images else model, messages=messages)
+            ai_reply = await ollama.chat(
+                "llava" if images else model, messages=messages
+            )
 
             if response := ai_reply["message"]["content"]:
                 if len(response) > 2000:

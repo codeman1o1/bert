@@ -232,33 +232,72 @@ async def on_message(message: discord.Message):
         return
 
     if message.channel.name == "bert-ai":
-        images = []
-        for sticker in message.stickers:
-            if sticker.format.name in ("png", "apng"):
-                images.append(await sticker.read())
-        for attachment in message.attachments:
-            if attachment.content_type.startswith("image"):
-                images.append(await attachment.read())
-        if images:
-            ai_reply = await ollama.generate(
-                model="llava",
-                prompt=message.content or "Describe the following image(s):",
-                images=images,
-            )
-        else:
-            ai_reply = await ollama.generate(
-                model="llama2-uncensored", prompt=message.content
-            )
+        available_models = [
+            model["name"].split(":")[0]
+            for model in (await ollama.list())["models"]
+        ]
 
-        if ai_reply["response"]:
-            if len(ai_reply["response"]) > 2000:
-                await message.channel.send(
-                    "_The response is too long to send in one message_"
-                )
+        if message.content == "bert clear":
+            await message.channel.send("Understood. ||bert-ignore||")
+            return
+
+        if message.content.startswith("bert model "):
+            if (model := message.content.split(" ")[2]) in available_models:
+                await message.channel.send(f"Model set to {model}. ||bert-ignore||")
             else:
-                await message.channel.send(ai_reply["response"])
-        else:
-            await message.channel.send("_No response from AI_")
+                await message.channel.send(f"Model {model} is not available. ||bert-ignore||")
+            return
+
+        async with message.channel.typing():
+            images = []
+            for sticker in message.stickers:
+                if sticker.format.name in ("png", "apng"):
+                    images.append(await sticker.read())
+            for attachment in message.attachments:
+                if attachment.content_type.startswith("image"):
+                    images.append(await attachment.read())
+
+            model = "llama2-uncensored"
+            messages = []
+            history = await message.channel.history(
+                limit=100,
+                before=message.created_at,
+                after=message.created_at - timedelta(minutes=10),
+                oldest_first=True,
+            ).flatten()
+            for msg in history:
+                if "bert-ignore" not in msg.content:
+                    if msg.author.bot:
+                        if msg.author == bert.user:
+                            messages.append({"role": "assistant", "content": msg.content})
+                    elif msg.content == "bert clear":
+                        messages.clear()
+                    elif msg.content.startswith("bert model "):
+                        if msg.content.split(" ")[2] in available_models:
+                            model = msg.content.split(" ")[2]
+                    else:
+                        images = []
+                        for sticker in message.stickers:
+                            if sticker.format.name in ("png", "apng"):
+                                images.append(await sticker.read())
+                        for attachment in message.attachments:
+                            if attachment.content_type.startswith("image"):
+                                images.append(await attachment.read())
+
+                        messages.append({"role": "user", "content": msg.content, "images": images})
+            messages.append({"role": "user", "content": message.content, "images": images})
+
+            ai_reply = await ollama.chat("llava" if images else model, messages=messages)
+
+            if response := ai_reply["message"]["content"]:
+                if len(response) > 2000:
+                    await message.channel.send(
+                        "_The response is too long to send in one message_"
+                    )
+                else:
+                    await message.channel.send(response)
+            else:
+                await message.channel.send("_No response from AI_")
 
 
 @bert.event

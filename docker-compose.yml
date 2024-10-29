@@ -53,7 +53,7 @@ services:
     healthcheck:
       test: nc -z localhost 2333
       start_period: 3s
-      interval: 1s
+      interval: 2s
       timeout: 2s
       retries: 5
     env_file:

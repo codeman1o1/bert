@@ -11,13 +11,13 @@
 		"lint": "eslint ."
 	},
 	"dependencies": {
-		"@nuxt/eslint": "^0.5.7",
+		"@nuxt/eslint": "^0.6.1",
 		"@nuxtjs/tailwindcss": "^6.12.1",
 		"nuxt": "^3.13.2"
 	},
 	"devDependencies": {
 		"@nuxt/devtools": "latest",
-		"eslint": "^9.11.1",
+		"eslint": "^9.13.0",
 		"eslint-config-prettier": "^9.1.0",
 		"eslint-plugin-prettier": "^5.2.1",
 		"prettier": "^3.3.3",

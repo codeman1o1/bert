@@ -1,6 +1,6 @@
 lavalink:
   plugins:
-    - dependency: "dev.lavalink.youtube:youtube-plugin:1.11.0"
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.11.1"
       snapshot: false
   server:
     sources:

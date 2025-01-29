@@ -6,6 +6,8 @@ services:
     image: codeman1o1/bert
     env_file:
       - .env
+    volumes:
+      - ./bot/sounds:/usr/src/app/sounds
     depends_on:
       pocketbase:
         condition: service_healthy

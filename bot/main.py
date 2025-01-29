@@ -13,6 +13,7 @@ from random import choice, randint
 from typing import List
 from zoneinfo import ZoneInfo
 
+from art import text2art
 import coloredlogs
 import discord
 import feedparser
@@ -189,6 +190,16 @@ async def send_holiday():
             holidays.remove(holiday)
 
 
+@tasks.loop(time=time(hour=00, minute=00, second=00, tzinfo=TZ))
+async def happy_new_year():
+    if datetime.now().date() == datetime.now().replace(month=1, day=1).date():
+        text = text2art(f"{datetime.now().year}\nHappy\nNew Year!", "big")
+        for guild in bert.guilds:
+            if guild.system_channel:
+                await guild.system_channel.send(f"```{text}```\n# Happy New Year! 🎉🎉")
+        print(text)
+
+
 async def clean_db():
     channels = await PB.collection("vcmaker").get_full_list()
     deleted = 0
@@ -213,6 +224,10 @@ async def on_ready():
     if not send_holiday.is_running():
         logger.info("Starting holiday task")
         send_holiday.start()
+
+    if not happy_new_year.is_running():
+        logger.info("Starting New Year task")
+        happy_new_year.start()
 
     await clean_db()
 

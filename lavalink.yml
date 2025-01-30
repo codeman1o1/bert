@@ -6,3 +6,9 @@ lavalink:
     sources:
       youtube: false
       local: true
+
+plugins:
+  youtube:
+    enabled: true
+    oauth:
+      enabled: true

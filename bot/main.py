@@ -2,31 +2,28 @@ import asyncio
 import base64
 import binascii
 import contextlib
-import logging
 import os
-import re
 import string
 import sys
 from asyncio import sleep
 from datetime import UTC, datetime, time, timedelta
 from random import choice, randint
-from typing import List
 from zoneinfo import ZoneInfo
 
-from art import text2art
-import coloredlogs
 import discord
 import feedparser
 import requests
 import wavelink
+from art import text2art
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from ollama import AsyncClient
-from pocketbase import PocketBaseError  # type: ignore
+from generic import logger
 from pb import PB, pb_login
 from ui.message import StoreMessage
 from ui.musik import AddBack, RestoreQueue
+
+from pocketbase import PocketBaseError  # type: ignore
 
 load_dotenv()
 
@@ -38,44 +35,6 @@ bert = commands.Bot(
 
 TZ = ZoneInfo(os.getenv("TZ") or "Europe/Amsterdam")
 
-ollama = AsyncClient(host=os.getenv("OLLAMA_URL") or "http://ai:11434")
-
-
-class LogFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord):
-        regexs = [
-            r"^Shard ID (%s) has sent the (\w+) payload\.$",
-            r"^Got a request to (%s) the websocket\.$",
-            r"^Shard ID (%s) has connected to Gateway: (%s) \(Session ID: (%s)\)\.$",
-            r"^Shard ID (%s) has successfully (\w+) session (%s) under trace %s\.$",
-            r"^Websocket closed with (%s), attempting a reconnect\.$",
-        ]
-        # 0 means block, anything else (e.g. 1) means allow
-        return next((0 for regex in regexs if re.match(regex, str(record.msg))), 1)
-
-
-TEXT_FORMAT = "%(asctime)s %(name)s %(levelname)s %(message)s"
-handler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="w")
-handler.setFormatter(logging.Formatter(TEXT_FORMAT))
-
-logger = logging.getLogger("bert")
-logger.addHandler(handler)
-coloredlogs.install(
-    level=logging.DEBUG,
-    logger=logger,
-    fmt=TEXT_FORMAT,
-)
-
-pycord_logger = logging.getLogger("discord")
-pycord_logger.addHandler(handler)
-coloredlogs.install(
-    level=logging.INFO,
-    logger=pycord_logger,
-    fmt=TEXT_FORMAT,
-)
-
-for pycord_handler in pycord_logger.handlers:
-    pycord_handler.addFilter(LogFilter())
 
 events = []
 CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3/calendars"
@@ -102,23 +61,6 @@ for event in events:
             }
         )
 logger.info("Found %s upcoming holidays", len(holidays))
-
-
-async def download_ai_models(models: List[str]):
-    """Download the AI models from the Ollama server."""
-    downloaded_models = await ollama.list()
-    for model in models.copy():
-        if any(
-            m["name"].replace(":latest", "") == model
-            for m in downloaded_models["models"]
-        ):
-            models.remove(model)
-    if not models:
-        return
-    logger.debug("Downloading %s AI models (%s)", len(models), ", ".join(models))
-    for model in models:
-        logger.debug("Downloading %s...", model)
-        await ollama.pull(model=model)
 
 
 async def connect_nodes():
@@ -238,109 +180,11 @@ async def on_message(message: discord.Message):
         return
 
     if isinstance(message.channel, discord.DMChannel):
-        if message.content:
-            await message.channel.send(message.content)
         return
 
     if message.channel.name == "silence":
         await message.delete()
         return
-
-    if message.channel.name == "bert-ai":
-        available_models = [
-            model["name"].split(":")[0] for model in (await ollama.list())["models"]
-        ]
-        model = "llama2-uncensored"
-
-        if message.content == "bert clear":
-            await message.channel.send("Understood. ||bert-ignore||")
-            return
-
-        if message.content.startswith("bert model"):
-            if len(message.content.split(" ")) == 2:
-                history = await message.channel.history(
-                    limit=100,
-                    before=message.created_at,
-                    after=message.created_at - timedelta(minutes=10),
-                ).flatten()
-                history.reverse()
-                for msg in history:
-                    if "bert-ignore" not in msg.content and not msg.author.bot:
-                        if msg.content == "bert clear":
-                            break
-                        if (
-                            msg.content.startswith("bert model ")
-                            and msg.content.split(" ")[2] in available_models
-                        ):
-                            model = msg.content.split(" ")[2]
-                            break
-                await message.channel.send(f"Current model is {model}. ||bert-ignore||")
-            else:
-                if (model := message.content.split(" ")[2]) in available_models:
-                    await message.channel.send(f"Model set to {model}. ||bert-ignore||")
-                else:
-                    await message.channel.send(
-                        f"Model {model} is not available. ||bert-ignore||"
-                    )
-            return
-
-        async with message.channel.typing():
-            images = []
-            for sticker in message.stickers:
-                if sticker.format.name in ("png", "apng"):
-                    images.append(await sticker.read())
-            for attachment in message.attachments:
-                if attachment.content_type.startswith("image"):
-                    images.append(await attachment.read())
-
-            messages = []
-            history = await message.channel.history(
-                limit=100,
-                before=message.created_at,
-                after=message.created_at - timedelta(minutes=10),
-                oldest_first=True,
-            ).flatten()
-            for msg in history:
-                if "bert-ignore" not in msg.content:
-                    if msg.author.bot:
-                        if msg.author == bert.user:
-                            messages.append(
-                                {"role": "assistant", "content": msg.content}
-                            )
-                    elif msg.content == "bert clear":
-                        messages.clear()
-                    elif msg.content.startswith("bert model "):
-                        if msg.content.split(" ")[2] in available_models:
-                            model = msg.content.split(" ")[2]
-                    else:
-                        images = []
-                        for sticker in message.stickers:
-                            if sticker.format.name in ("png", "apng"):
-                                images.append(await sticker.read())
-                        for attachment in message.attachments:
-                            if attachment.content_type.startswith("image"):
-                                images.append(await attachment.read())
-
-                        messages.append(
-                            {"role": "user", "content": msg.content, "images": images}
-                        )
-            messages.append(
-                {"role": "user", "content": message.content, "images": images}
-            )
-
-            ai_reply = await ollama.chat(
-                "llava" if images else model, messages=messages
-            )
-
-            if response := ai_reply["message"]["content"]:
-                if len(response) > 2000:
-                    await message.channel.send(
-                        "_The response is too long to send in one message_"
-                    )
-                else:
-                    await message.channel.send(response)
-            else:
-                await message.channel.send("_No response from AI_")
 
 
 @bert.event
@@ -581,39 +425,6 @@ async def delete(interaction: discord.Interaction, key: str):
         await interaction.response.send_message(
             "No message found with that key", ephemeral=True
         )
-
-
-async def autocomplete_models(ctx: discord.AutocompleteContext):
-    """Autocomplete the AI models from the Ollama server."""
-    models = (await ollama.list())["models"]
-    return [
-        discord.OptionChoice(model["name"].split(":")[0])
-        for model in models
-        if ctx.value in model["name"].split(":")[0]
-    ]
-
-
-@bert.slash_command(
-    integration_types={
-        discord.IntegrationType.guild_install,
-        discord.IntegrationType.user_install,
-    }
-)
-@option("prompt", description="The prompt to give to the AI")
-@option("model", description="The model to use", autocomplete=autocomplete_models)
-async def ai(interaction: discord.Interaction, prompt: str, model: str = "llama3.2"):
-    """Bert AI Technologies Ltd."""
-    await interaction.response.defer()
-    ai_response = await ollama.generate(model, prompt)
-    if response := ai_response["response"]:
-        if len(response) > 2000:
-            await interaction.followup.send(
-                "_The response is too long to send in one message_"
-            )
-        else:
-            await interaction.followup.send(response)
-    else:
-        await interaction.followup.send("_No response from AI_")
 
 
 @bert.slash_command(integration_types={discord.IntegrationType.user_install})
@@ -1154,7 +965,10 @@ async def main():
     except PocketBaseError:
         logger.critical("Failed to login to Pocketbase")
         sys.exit(111)  # Exit code 111: Connection refused
-    await download_ai_models(["llama2-uncensored", "llava"])
+    if os.getenv("OLLAMA_URL"):
+        bert.load_extension("ai")
+    else:
+        logger.info("No OLLAMA_URL set, AI functionality will be disabled")
     async with bert:
         await bert.start(os.getenv("BOT_TOKEN"))
 

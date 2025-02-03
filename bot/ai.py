@@ -16,8 +16,7 @@ async def download_ai_models(models: List[str]):
     downloaded_models = await ollama.list()
     for model in models.copy():
         if any(
-            m["name"].replace(":latest", "") == model
-            for m in downloaded_models["models"]
+            m.model.replace(":latest", "") == model for m in downloaded_models.models
         ):
             models.remove(model)
     if not models:
@@ -30,11 +29,11 @@ async def download_ai_models(models: List[str]):
 
 async def autocomplete_models(ctx: discord.AutocompleteContext):
     """Autocomplete the AI models from the Ollama server."""
-    models = (await ollama.list())["models"]
+    models = await ollama.list()
     return [
-        discord.OptionChoice(model["name"].split(":")[0])
-        for model in models
-        if ctx.value in model["name"].split(":")[0]
+        discord.OptionChoice(model.model.split(":")[0])
+        for model in models.models
+        if ctx.value in model.model.split(":")[0]
     ]
 
 
@@ -79,7 +78,7 @@ class AICog(commands.Cog):
             return
 
         available_models = [
-            model["name"].split(":")[0] for model in (await ollama.list())["models"]
+            model.model.split(":")[0] for model in (await ollama.list()).models
         ]
         model = "llama2-uncensored"
 

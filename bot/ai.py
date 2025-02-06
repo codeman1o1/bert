@@ -55,7 +55,7 @@ class AICog(commands.Cog):
         """Bert AI Technologies Ltd."""
         await ctx.defer()
         ai_response = await ollama.generate(model, prompt)
-        if response := ai_response["response"]:
+        if response := ai_response.response:
             if len(response) > 2000:
                 await ctx.send_followup(
                     "_The response is too long to send in one message_"
@@ -161,7 +161,7 @@ class AICog(commands.Cog):
                 "llava" if images else model, messages=messages
             )
 
-            if response := ai_reply["message"]["content"]:
+            if response := ai_reply.message.content:
                 if len(response) > 2000:
                     await message.channel.send(
                         "_The response is too long to send in one message_"

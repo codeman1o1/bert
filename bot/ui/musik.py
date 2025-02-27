@@ -48,3 +48,24 @@ class RestoreQueue(MusicView):
         await interaction.response.send_message("Queue restored")
         button.disabled = True
         await interaction.followup.edit_message(interaction.message.id, view=self)
+
+
+class StopPlayer(MusicView):
+    def __init__(self, ephemeral: bool):
+        super().__init__()
+        self.ephemeral = ephemeral
+
+    @discord.ui.button(label="Stop", style=discord.ButtonStyle.red, emoji="⏹️")
+    async def stop_player(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        player: wavelink.Player | None = interaction.guild.voice_client
+        if not player:
+            await interaction.response.send_message(
+                "I'm not connected to a voice channel", ephemeral=self.ephemeral
+            )
+            return
+        await player.disconnect()
+        await interaction.response.send_message("Stopped", ephemeral=self.ephemeral)
+        button.disabled = True
+        await interaction.followup.edit_message(interaction.message.id, view=self)

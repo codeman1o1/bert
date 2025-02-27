@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 from generic import logger
 from pb import PB, pb_login
 from ui.message import StoreMessage
-from ui.musik import AddBack, RestoreQueue
+from ui.musik import AddBack, RestoreQueue, StopPlayer
 
 from pocketbase import PocketBaseError  # type: ignore
 
@@ -513,6 +513,48 @@ async def everythingisawesomebutinkorean(interaction: discord.Interaction):
 모든 게 굉장해!
 꿈을 이룰 때.](https://youtu.be/g55SloahAj0)"""
     )
+
+
+@bert.slash_command()
+@option("volume", description="The volume to play the song at (0-1000)")
+async def nevergonnagiveyouup(interaction: discord.Interaction, volume: int = 1000):
+    """get rickrolled"""
+    if not interaction.user.voice:
+        await interaction.response.send_message(
+            "You are not in a voice channel", ephemeral=True
+        )
+        return
+
+    tracks = await wavelink.Playable.search(
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    )
+    track = tracks[0]
+
+    player: wavelink.Player | None = interaction.guild.voice_client
+
+    if not player:
+        try:
+            player = await interaction.user.voice.channel.connect(cls=wavelink.Player)
+        except AttributeError:
+            await interaction.response.send_message(
+                "Please join a voice channel first before using this command.",
+                ephemeral=True,
+            )
+            return
+        except discord.ClientException:
+            await interaction.response.send_message(
+                "I was unable to join this voice channel. Please try again."
+            )
+            return
+
+    player.autoplay = wavelink.AutoPlayMode.partial
+
+    await interaction.response.send_message(
+        "Rickrolling...", view=StopPlayer(ephemeral=True), ephemeral=True
+    )
+
+    if not player.playing:
+        await player.play(track, volume=volume)
 
 
 @bert.slash_command(name="bert")

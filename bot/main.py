@@ -1001,6 +1001,96 @@ async def play(
         await player.play(player.queue.get(), volume=30)
 
 
+pl = bert.create_group("pl", "playlists")
+
+
+@pl.command(name="save", description="Save a playlist")
+@option("name", description="The name to store as (default: the playlist name)")
+@option("url", description="The URL of the playlist")
+async def save_playlist(interaction: discord.Interaction, url: str, name: str = None):
+    """Save a playlist"""
+    result = await wavelink.Playable.search(url)
+    if not isinstance(result, wavelink.Playlist):
+        await interaction.response.send_message("That's not a playlist", ephemeral=True)
+        return
+    name = name or result.name
+    await PB.collection("playlists").create(
+        {"name": name, "url": url, "user_id": str(interaction.user.id)}
+    )
+    await interaction.response.send_message(
+        f"Saved the playlist as **`{name}`**. Use `/pl load` to load it"
+    )
+
+
+async def load_playlists(ctx: discord.AutocompleteContext):
+    """load the users playlists"""
+    try:
+        playlists = await PB.collection("playlists").get_full_list(
+            {"filter": f"user_id='{ctx.interaction.user.id}'"}
+        )
+        return [
+            discord.OptionChoice(playlist["name"], playlist["id"])
+            for playlist in playlists
+        ]
+    except PocketBaseError:
+        return []
+
+
+@pl.command(name="load", description="Load a playlist")
+@option("name", description="The name of the playlist", autocomplete=load_playlists)
+async def load_playlist(interaction: discord.Interaction, name: str):
+    """Load a playlist"""
+    if not interaction.user.voice:
+        await interaction.response.send_message(
+            "You are not in a voice channel", ephemeral=True
+        )
+        return
+
+    player: wavelink.Player | None = interaction.guild.voice_client
+
+    if not player:
+        try:
+            player = await interaction.user.voice.channel.connect(cls=wavelink.Player)
+        except AttributeError:
+            await interaction.response.send_message(
+                "Please join a voice channel first before using this command.",
+                ephemeral=True,
+            )
+            return
+        except discord.ClientException:
+            await interaction.response.send_message(
+                "I was unable to join this voice channel. Please try again."
+            )
+            return
+
+    row = await PB.collection("playlists").get_first(
+        {"filter": f"id='{name}' && user_id='{str(interaction.user.id)}'"}
+    )
+    playlist = await wavelink.Playable.search(row["url"])
+
+    player.autoplay = wavelink.AutoPlayMode.partial
+
+    await player.queue.put_wait(playlist)
+
+    await interaction.response.send_message(
+        f"Loaded the playlist **`{row['name']}`** ({len(playlist)} songs)"
+    )
+
+    if not player.playing:
+        await player.play(player.queue.get(), volume=30)
+
+
+@pl.command(name="delete", description="Delete a playlist")
+@option("name", description="The name of the playlist", autocomplete=load_playlists)
+async def delete_playlist(interaction: discord.Interaction, name: str):
+    """Delete a playlist"""
+    row = await PB.collection("playlists").get_first(
+        {"filter": f"id='{name}' && user_id='{str(interaction.user.id)}'"}
+    )
+    await PB.collection("playlists").delete(name)
+    await interaction.response.send_message(f"Deleted the playlist **`{row['name']}`**")
+
+
 @bert.slash_command()
 async def skip(interaction: discord.Interaction):
     """Skip the current song"""

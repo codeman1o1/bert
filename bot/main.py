@@ -1155,6 +1155,25 @@ async def stop(interaction: discord.Interaction):
     )
 
 
+@bert.slash_command()
+@option(
+    "volume",
+    description="The volume to set the player to (0-1000). (default: 30)",
+    min_value=0,
+    max_value=1000,
+)
+async def volume(interaction: discord.Interaction, volume: int = 30):
+    """Set Bert's volume"""
+    player: wavelink.Player | None = interaction.guild.voice_client
+
+    if not player:
+        await interaction.response.send_message("Not playing anything", ephemeral=True)
+        return
+
+    await player.set_volume(volume)
+    await interaction.response.send_message(f"Set the volume to {volume}")
+
+
 async def main():
     try:
         await pb_login()

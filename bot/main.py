@@ -1059,7 +1059,7 @@ async def skip(interaction: discord.Interaction):
     player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
-        await interaction.response.send_message("Not playing anything")
+        await interaction.response.send_message("Not playing anything", ephemeral=True)
         return
 
     current_track = player.current
@@ -1071,12 +1071,38 @@ async def skip(interaction: discord.Interaction):
 
 
 @bert.slash_command()
+async def pause(interaction: discord.Interaction):
+    """Pause the current song"""
+    player: wavelink.Player | None = interaction.guild.voice_client
+
+    if not player:
+        await interaction.response.send_message("Not playing anything", ephemeral=True)
+        return
+
+    await player.pause(True)
+    await interaction.response.send_message("Paused the current song")
+
+
+@bert.slash_command()
+async def resume(interaction: discord.Interaction):
+    """Resume the current song"""
+    player: wavelink.Player | None = interaction.guild.voice_client
+
+    if not player:
+        await interaction.response.send_message("Not playing anything", ephemeral=True)
+        return
+
+    await player.pause(False)
+    await interaction.response.send_message("Resumed the current song")
+
+
+@bert.slash_command()
 async def stop(interaction: discord.Interaction):
     """Stop playing"""
     player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
-        await interaction.response.send_message("Not playing anything")
+        await interaction.response.send_message("Not playing anything", ephemeral=True)
         return
 
     current_queue = wavelink.Queue()
@@ -1089,6 +1115,25 @@ async def stop(interaction: discord.Interaction):
     await interaction.response.send_message(
         "Stopped playing", view=RestoreQueue(current_queue)
     )
+
+
+@bert.slash_command()
+@option(
+    "volume",
+    description="The volume to set the player to (0-1000). (default: 30)",
+    min_value=0,
+    max_value=1000,
+)
+async def volume(interaction: discord.Interaction, volume: int = 30):
+    """Set Bert's volume"""
+    player: wavelink.Player | None = interaction.guild.voice_client
+
+    if not player:
+        await interaction.response.send_message("Not playing anything", ephemeral=True)
+        return
+
+    await player.set_volume(volume)
+    await interaction.response.send_message(f"Set the volume to {volume}")
 
 
 async def main():

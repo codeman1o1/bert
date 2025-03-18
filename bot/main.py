@@ -1097,7 +1097,7 @@ async def skip(interaction: discord.Interaction):
     player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
-        await interaction.response.send_message("Not playing anything")
+        await interaction.response.send_message("Not playing anything", ephemeral=True)
         return
 
     current_track = player.current
@@ -1114,7 +1114,7 @@ async def pause(interaction: discord.Interaction):
     player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
-        await interaction.response.send_message("Not playing anything")
+        await interaction.response.send_message("Not playing anything", ephemeral=True)
         return
 
     await player.pause(True)
@@ -1127,7 +1127,7 @@ async def resume(interaction: discord.Interaction):
     player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
-        await interaction.response.send_message("Not playing anything")
+        await interaction.response.send_message("Not playing anything", ephemeral=True)
         return
 
     await player.pause(False)
@@ -1140,7 +1140,7 @@ async def stop(interaction: discord.Interaction):
     player: wavelink.Player | None = interaction.guild.voice_client
 
     if not player:
-        await interaction.response.send_message("Not playing anything")
+        await interaction.response.send_message("Not playing anything", ephemeral=True)
         return
 
     current_queue = wavelink.Queue()

@@ -13,6 +13,8 @@ services:
         condition: service_healthy
       lavalink:
         condition: service_healthy
+      ai:
+        condition: service_started
     restart: unless-stopped
 
   website:
@@ -70,5 +72,20 @@ services:
       - ./bot/sounds:/opt/Lavalink/sounds
     restart: unless-stopped
 
+  ai:
+    container_name: bert-ai
+    image: ollama/ollama
+    volumes:
+      - ai:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
 volumes:
   pocketbase:
+  ai:

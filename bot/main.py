@@ -1109,6 +1109,32 @@ async def skip(interaction: discord.Interaction):
 
 
 @bert.slash_command()
+async def pause(interaction: discord.Interaction):
+    """Pause the current song"""
+    player: wavelink.Player | None = interaction.guild.voice_client
+
+    if not player:
+        await interaction.response.send_message("Not playing anything")
+        return
+
+    await player.pause(True)
+    await interaction.response.send_message("Paused the current song")
+
+
+@bert.slash_command()
+async def resume(interaction: discord.Interaction):
+    """Resume the current song"""
+    player: wavelink.Player | None = interaction.guild.voice_client
+
+    if not player:
+        await interaction.response.send_message("Not playing anything")
+        return
+
+    await player.pause(False)
+    await interaction.response.send_message("Resumed the current song")
+
+
+@bert.slash_command()
 async def stop(interaction: discord.Interaction):
     """Stop playing"""
     player: wavelink.Player | None = interaction.guild.voice_client

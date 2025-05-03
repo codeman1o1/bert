@@ -148,16 +148,16 @@ class AICog(commands.Cog):
                         if msg.content.split(" ")[2] in available_models:
                             model = msg.content.split(" ")[2]
                     else:
-                        images = []
-                        for sticker in message.stickers:
+                        images_ = []
+                        for sticker in msg.stickers:
                             if sticker.format.name in ("png", "apng"):
-                                images.append(await sticker.read())
-                        for attachment in message.attachments:
+                                images_.append(await sticker.read())
+                        for attachment in msg.attachments:
                             if attachment.content_type.startswith("image"):
-                                images.append(await attachment.read())
+                                images_.append(await attachment.read())
 
                         messages.append(
-                            {"role": "user", "content": msg.content, "images": images}
+                            {"role": "user", "content": msg.content, "images": images_}
                         )
             messages.append(
                 {"role": "user", "content": message.content, "images": images}

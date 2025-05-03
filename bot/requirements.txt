@@ -6,5 +6,5 @@ pocketbase-async==0.11.0
 coloredlogs==15.0.1
 feedparser==6.0.11
 PyNaCl==1.5.0
-ollama==0.4.7
+ollama==0.4.8
 art==6.4

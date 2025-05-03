@@ -42,6 +42,7 @@ async def autocomplete_models(ctx: discord.AutocompleteContext):
 class AICog(commands.Cog):
     def __init__(self, bot: discord.Bot):
         self.bert = bot
+        self._models_downloaded = False
 
     @commands.slash_command(
         integration_types={
@@ -69,7 +70,10 @@ class AICog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        await download_ai_models(["llama2-uncensored", "llava"])
+        if not self._models_downloaded:
+            # To avoid checking when Discord reconnects due to network issues
+            await download_ai_models(["llama2-uncensored", "llava"])
+            self._models_downloaded = True
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):

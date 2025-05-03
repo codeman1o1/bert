@@ -2,9 +2,7 @@ import asyncio
 import base64
 import binascii
 import contextlib
-import logging
 import os
-import re
 import string
 import sys
 from asyncio import sleep
@@ -12,19 +10,21 @@ from datetime import UTC, datetime, time, timedelta
 from random import choice, randint
 from zoneinfo import ZoneInfo
 
-from art import text2art
-import coloredlogs
 import discord
 import feedparser
 import requests
 import wavelink
+from art import text2art
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from pocketbase import PocketBaseError  # type: ignore
+from requests.exceptions import RequestException
+from generic import logger
 from pb import PB, pb_login
 from ui.message import StoreMessage
 from ui.musik import AddBack, RestoreQueue, StopPlayer
+
+from pocketbase import PocketBaseError  # type: ignore
 
 load_dotenv()
 
@@ -37,42 +37,6 @@ bert = commands.Bot(
 TZ = ZoneInfo(os.getenv("TZ") or "Europe/Amsterdam")
 
 
-class LogFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord):
-        regexs = [
-            r"^Shard ID (%s) has sent the (\w+) payload\.$",
-            r"^Got a request to (%s) the websocket\.$",
-            r"^Shard ID (%s) has connected to Gateway: (%s) \(Session ID: (%s)\)\.$",
-            r"^Shard ID (%s) has successfully (\w+) session (%s) under trace %s\.$",
-            r"^Websocket closed with (%s), attempting a reconnect\.$",
-        ]
-        # 0 means block, anything else (e.g. 1) means allow
-        return next((0 for regex in regexs if re.match(regex, str(record.msg))), 1)
-
-
-TEXT_FORMAT = "%(asctime)s %(name)s %(levelname)s %(message)s"
-handler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="w")
-handler.setFormatter(logging.Formatter(TEXT_FORMAT))
-
-logger = logging.getLogger("bert")
-logger.addHandler(handler)
-coloredlogs.install(
-    level=logging.DEBUG,
-    logger=logger,
-    fmt=TEXT_FORMAT,
-)
-
-pycord_logger = logging.getLogger("discord")
-pycord_logger.addHandler(handler)
-coloredlogs.install(
-    level=logging.INFO,
-    logger=pycord_logger,
-    fmt=TEXT_FORMAT,
-)
-
-for pycord_handler in pycord_logger.handlers:
-    pycord_handler.addFilter(LogFilter())
-
 events = []
 CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3/calendars"
 CALENDAR_HOLIDAY = r"nl.dutch%23holiday@group.v.calendar.google.com"
@@ -83,7 +47,7 @@ try:
     )
     res.raise_for_status()
     events = res.json()["items"]
-except requests.exceptions.RequestException as error:
+except RequestException as error:
     logger.error("Failed to fetch holidays: %s", error)
 holidays = []
 for event in events:
@@ -106,7 +70,8 @@ async def connect_nodes():
 
     nodes = [
         wavelink.Node(
-            uri="http://lavalink:2333", password=os.getenv("LAVALINK_PASSWORD")
+            uri=os.getenv("LAVALINK_URL") or "http://lavalink:2333",
+            password=os.getenv("LAVALINK_PASSWORD"),
         )
     ]
     await wavelink.Pool.connect(nodes=nodes, client=bert)
@@ -216,8 +181,6 @@ async def on_message(message: discord.Message):
         return
 
     if isinstance(message.channel, discord.DMChannel):
-        if message.content:
-            await message.channel.send(message.content)
         return
 
     if message.channel.name == "silence":
@@ -1180,6 +1143,22 @@ async def main():
     except PocketBaseError:
         logger.critical("Failed to login to Pocketbase")
         sys.exit(111)  # Exit code 111: Connection refused
+    if os.getenv("OLLAMA_URL"):
+        try:
+            res = requests.get(os.getenv("OLLAMA_URL"), timeout=10)
+            if res.text == "Ollama is running":
+                logger.info("Ollama is running, enabling Bert AI")
+                bert.load_extension("ai")
+            else:
+                logger.warning(
+                    "Ollama doesn't seem to be running on %s", os.getenv("OLLAMA_URL")
+                )
+                logger.info("AI functionality will be disabled")
+        except RequestException:
+            logger.warning("Failed to connect to %s", os.getenv("OLLAMA_URL"))
+            logger.info("AI functionality will be disabled")
+    else:
+        logger.info("No OLLAMA_URL set, AI functionality will be disabled")
     async with bert:
         await bert.start(os.getenv("BOT_TOKEN"))
 

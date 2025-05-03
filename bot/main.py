@@ -18,6 +18,7 @@ from art import text2art
 from discord.commands import option
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+from requests.exceptions import RequestException
 from generic import logger
 from pb import PB, pb_login
 from ui.message import StoreMessage
@@ -46,7 +47,7 @@ try:
     )
     res.raise_for_status()
     events = res.json()["items"]
-except requests.exceptions.RequestException as error:
+except RequestException as error:
     logger.error("Failed to fetch holidays: %s", error)
 holidays = []
 for event in events:
@@ -1143,7 +1144,19 @@ async def main():
         logger.critical("Failed to login to Pocketbase")
         sys.exit(111)  # Exit code 111: Connection refused
     if os.getenv("OLLAMA_URL"):
-        bert.load_extension("ai")
+        try:
+            res = requests.get(os.getenv("OLLAMA_URL"), timeout=10)
+            if res.text == "Ollama is running":
+                logger.info("Ollama is running, enabling Bert AI")
+                bert.load_extension("ai")
+            else:
+                logger.warning(
+                    "Ollama doesn't seem to be running on %s", os.getenv("OLLAMA_URL")
+                )
+                logger.info("AI functionality will be disabled")
+        except RequestException:
+            logger.warning("Failed to connect to %s", os.getenv("OLLAMA_URL"))
+            logger.info("AI functionality will be disabled")
     else:
         logger.info("No OLLAMA_URL set, AI functionality will be disabled")
     async with bert:

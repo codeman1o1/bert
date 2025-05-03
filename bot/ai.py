@@ -10,6 +10,8 @@ from ollama import AsyncClient
 
 ollama = AsyncClient(os.getenv("OLLAMA_URL"))
 
+TOO_LONG_MSG = " **[MESSAGE TOO LONG]**"
+
 
 async def download_ai_models(models: List[str]):
     """Download the AI models from the Ollama server."""
@@ -58,7 +60,7 @@ class AICog(commands.Cog):
         if response := ai_response.response:
             if len(response) > 2000:
                 await ctx.send_followup(
-                    "_The response is too long to send in one message_"
+                    response[: 2000 - len(TOO_LONG_MSG)] + TOO_LONG_MSG
                 )
             else:
                 await ctx.send_followup(response)
@@ -164,7 +166,7 @@ class AICog(commands.Cog):
             if response := ai_reply.message.content:
                 if len(response) > 2000:
                     await message.channel.send(
-                        "_The response is too long to send in one message_"
+                        response[: 2000 - len(TOO_LONG_MSG)] + TOO_LONG_MSG
                     )
                 else:
                     await message.channel.send(response)

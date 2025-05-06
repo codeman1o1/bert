@@ -5,76 +5,60 @@ on:
   push:
     branches:
       - main
+    paths:
+      - bot/**
+      - website/**
   pull_request:
     branches:
       - main
+    paths:
+      - bot/**
+      - website/**
 
 jobs:
   eslint:
     name: ESLint
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      packages: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          cd website
+          npm ci
+
+      - name: Run ESLint
+        run: |
+          cd website
+          npm run lint
+
+  ruff:
+    name: Ruff
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
         with:
-          node-version: 20
+          python-version: "3.12"
 
-      - name: Install Node dependencies
+      - name: Install dependencies
         run: |
-          cd website
-          npm ci
+          python -m pip install --upgrade pip
+          pip install ruff
 
-      - name: Lint
+      - name: Run Ruff
         run: |
-          cd website
-          npm run lint
-
-  # super-linter:
-  #   name: Super-Linter
-  #   runs-on: ubuntu-latest
-
-  #   permissions:
-  #     contents: read
-  #     packages: read
-  #     # To report GitHub Actions status checks
-  #     statuses: write
-
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-
-  #     - name: Install Python 3.12
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: 3.12
-
-  #     - name: Install Python dependencies
-  #       run: pip install -r bot/requirements.txt
-
-  #     - name: Install Node dependencies
-  #       run: |
-  #         cd website
-  #         npm ci
-  #         mv node_modules ../node_modules
-
-  #     - name: Remove generated files
-  #       run: rm -rf pocketbase/migrations pocketbase/pb_data
-
-  #     - name: Super-linter
-  #       uses: super-linter/super-linter/slim@v5.7.2
-  #       env:
-  #         DEFAULT_BRANCH: main
-  #         LINTER_RULES_PATH: /
-  #         VALIDATE_HTML: false # too opinionated and full of bs
-  #         TYPESCRIPT_DEFAULT_STYLE: prettier
-  #         TYPESCRIPT_ES_CONFIG_FILE: website/.eslintrc.cjs
-  #         # To report GitHub Actions status checks
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          cd bot
+          ruff check --output-format=github .
+          ruff format --check .

@@ -1143,19 +1143,18 @@ async def main():
     except PocketBaseError:
         logger.critical("Failed to login to Pocketbase")
         sys.exit(111)  # Exit code 111: Connection refused
-    if os.getenv("OLLAMA_URL"):
+
+    if ollama_url := os.getenv("OLLAMA_URL"):
         try:
-            res = requests.get(os.getenv("OLLAMA_URL"), timeout=10)
-            if res.text == "Ollama is running":
-                logger.info("Ollama is running, enabling Bert AI")
+            res = requests.get(ollama_url + "/api/version", timeout=10)
+            if ollama_version := res.json()["version"]:
+                logger.info("Ollama v%s running, enabling Bert AI", ollama_version)
                 bert.load_extension("ai")
             else:
-                logger.warning(
-                    "Ollama doesn't seem to be running on %s", os.getenv("OLLAMA_URL")
-                )
+                logger.warning("Ollama doesn't seem to be running on %s", ollama_url)
                 logger.info("AI functionality will be disabled")
-        except RequestException:
-            logger.warning("Failed to connect to %s", os.getenv("OLLAMA_URL"))
+        except RequestException as e:
+            logger.warning("Failed to connect to %s %s", ollama_url, e)
             logger.info("AI functionality will be disabled")
     else:
         logger.info("No OLLAMA_URL set, AI functionality will be disabled")

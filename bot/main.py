@@ -1158,6 +1158,7 @@ async def main():
             logger.info("AI functionality will be disabled")
     else:
         logger.info("No OLLAMA_URL set, AI functionality will be disabled")
+
     async with bert:
         await bert.start(os.getenv("BOT_TOKEN"))
 

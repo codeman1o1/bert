@@ -11,9 +11,9 @@
 		"lint": "eslint ."
 	},
 	"dependencies": {
-		"@nuxt/eslint": "^0.7.2",
+		"@nuxt/eslint": "^0.7.6",
 		"@nuxtjs/tailwindcss": "^6.12.1",
-		"nuxt": "^3.13.2"
+		"nuxt": "^3.16.2"
 	},
 	"devDependencies": {
 		"@nuxt/devtools": "latest",

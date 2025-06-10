@@ -1,4 +1,4 @@
-requests==2.32.2
+requests==2.32.4
 py-cord[voice]==2.6.1
 wavelink==3.4.1
 python-dotenv==1.1.0

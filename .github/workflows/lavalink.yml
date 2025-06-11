@@ -22,12 +22,12 @@ jobs:
           sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq &&\
           sudo chmod +x /usr/bin/yq
 
-      - name: Parse lavalink.yml and update plugin versions
+      - name: Parse lavalink.yml and update plugins
         id: update_plugins
         run: |
           # Create the Markdown file for the PR body
           PR_BODY_PATH="/tmp/pr-body.md"
-          echo "# Plugin Version Updates" > $PR_BODY_PATH
+          echo "# Lavalink Plugin Updates" > $PR_BODY_PATH
           echo "The following Lavalink plugins have been updated:" >> $PR_BODY_PATH
           echo "" >> $PR_BODY_PATH
 
@@ -82,8 +82,8 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Bump Lavalink plugin versions"
-          title: ":sparkles: Bump Lavalink plugin versions :sparkles:"
+          commit-message: "Bump Lavalink plugins"
+          title: ":sparkles: Bump Lavalink plugins :sparkles:"
           body-path: /tmp/pr-body.md
           branch: update-lavalink-plugins
           labels: dependencies
